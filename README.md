@@ -11,3 +11,10 @@ Le but est d'automatiser la recherche de circuits de randonnées accessibles en 
 
 [^1]: On fixe l'heure à 6h du matin pour être sur d'avoir le premier train, en supposant qu'une rando commence le plus tôt possible sauf si vous êtes bizarres
 [^2]: Pas trouvé quoi que ce soit sur le scraping dans les [CGU](https://ignrando.fr/fr/cgu) donc on va faire genre ça passe
+
+
+---
+## Objectifs
+- Faire un programme CLI (en C évidemment), pas un vieux script shell tout pourri
+- Multithreader le scraping
+- Exporter en `.html` 
