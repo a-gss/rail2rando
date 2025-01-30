@@ -14,6 +14,7 @@ DEPARTURE_TIME="2025-03-06T06:00:00+01:00"  # 6 March 2025, 06:00 AM
 
 # Perform the request
 curl 'https://plan.lio-occitanie.fr/fr/itineraire' --compressed -X POST \
+--resolve plan.lio-occitanie.fr:443:35.195.12.125 \
 -H 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:134.0) Gecko/20100101 Firefox/134.0' \
 -H 'Accept: text/html, */*; q=0.01' \
 -H 'Accept-Language: fr,fr-FR;q=0.8,en-US;q=0.5,en;q=0.3' \
