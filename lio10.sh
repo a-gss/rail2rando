@@ -84,13 +84,17 @@ perl -CSD -pe '
     s/\\n//g
 ' lio.rawhtml > lio.html
 
-if grep -q "Le calcul d'itinéraire n'a pas trouvé de résultat pour votre demande." lio.html; then
-    echo "Le calcul d'itinéraire n'a pas trouvé de résultat pour votre demande."
+ERROR_MSG=$(grep -oP "(Le calcul d'itinéraire n'a pas trouvé de résultat pour votre demande|Aucun itinéraire disponible pour le moment)" lio.html)
+if [ -n "$ERROR_MSG" ]; then
+    echo "$ERROR_MSG."
 else
     read START END HOURS MINUTES < <(perl -0777 -ne 'print "$1 $2 $3 $4\n" if /(\d{2}:\d{2})\..*?(\d{2}:\d{2}).*?(\d{1}).*?(\d{2})/' lio.html)
     echo "$FROM_NAME->$TO_NAME [$START]->[$END] (${HOURS}h${MINUTES})"
 fi
 
+
+# Aucun itinéraire disponible pour le moment
+
 rm lio.raw
-rm lio.rawhtml
-rm lio.html
+#rm lio.rawhtml
+#rm lio.html
