@@ -11,7 +11,10 @@ if [ $# -ne 3 ]; then
 fi
 
 # Télécharge la liste des gares d'occitanie
-curl -s -o gares.csv "https://data.laregion.fr/api/explore/v2.1/catalog/datasets/localisation-des-gares-et-haltes-ferroviaires-doccitanie/exports/csv?lang=fr&timezone=Europe%2FBerlin&use_labels=true&delimiter=%3B"
+if [ ! -f gares.csv ]; then
+    echo -ne "\e[33mTéléchargement de la liste des gares d'occitanie dans gares.csv...\e[0m"
+    curl -s -o gares.csv "https://data.laregion.fr/api/explore/v2.1/catalog/datasets/localisation-des-gares-et-haltes-ferroviaires-doccitanie/exports/csv?lang=fr&timezone=Europe%2FBerlin&use_labels=true&delimiter=%3B" && echo "OK"
+fi
 
 DATE_REGEX="^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
 TIME_REGEX="^[0-9]{2}:[0-9]{2}$"
@@ -30,19 +33,15 @@ if [[ ! $TIME =~ $TIME_REGEX ]]; then
     echo "Error: Invalid time format. Please use hh:mm."
     exit 1
 fi
+
 # quelques variables
 FROM_NAME="Toulouse"
 FROM_LAT="43.61121"
 FROM_LON="1.45362"
 
 TO_NAME="$3"
-#UIC=$(perl -ne 'if (/Cahors;.*?;(\d*);/i) { print $1 }' gares.csv)
-#UIC=$(perl -ne 'if (/Figeac;.*?;(\d*);/i) { print $1 }' gares.csv)
-#UIC=$(perl -ne 'if (/rodez;.*?;(\d*);/i) { print $1 }' gares.csv) # "/i" case-insensitive
 UIC=$(perl -ne "if (/\Q$TO_NAME\E;.*?;(\d*);/i) { print \$1 }" gares.csv)
 TO_ID="STOPAREA|LIO:StopArea:OCE$UIC"
-#DATE="2025-02-20"
-#TIME="18:00"
 
 # j'aime trop curl c'est trop fort
 curl 'https://plan.lio-occitanie.fr/fr/itineraire' -X POST \
@@ -94,3 +93,4 @@ fi
 
 rm lio.raw
 rm lio.rawhtml
+rm lio.html
