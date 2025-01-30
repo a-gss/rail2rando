@@ -61,7 +61,7 @@ perl -ne '
 perl -CSD -pe '
     s/\\u([0-9a-fA-F]{4})/chr(hex($1))/ge;
     s!\\/!/!g;
-    s/\\n/\n/g
+    s/\\n//g
 ' lio.rawhtml > lio.almosthtml
 
 perl -0777 -ne 'if (/(.*?)<span class="is-hide".*<\/span>(.*)/s) { print $1, $2 }' lio.almosthtml > lio.html
@@ -70,12 +70,8 @@ rm lio.raw
 rm lio.rawhtml
 rm lio.almosthtml
 
-#open lio.html
-
+IN=$(echo "${FROM_NAME}" | grep -oE "^\w+")
+OUT=$(echo "${TO_NAME}" | grep -oE "^\w+")
+read START END HOURS MINUTES < <(perl -0777 -ne 'print "$1 $2 $3 $4\n" if /(\d{2}:\d{2})\..*?(\d{2}:\d{2}).*?(\d{1}).*?(\d{2})/' lio.html)
 echo
-echo
-echo
-
-perl -0777 -ne 'print "[$1]->[$2]\n" if /Heure de départ : (\d{2}:\d{2})\./ and /prévue : (\d{2}:\d{2})\./' lio.html
-
-echo
+echo "$IN->$OUT [$START]->[$END] (${HOURS}h${MINUTES})"
