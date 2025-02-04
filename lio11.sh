@@ -9,7 +9,7 @@
 #       - pas d'origine / destination -> echo "mais tu va ou mgl??"
 
 if [ $# -ne 4 ]; then
-    echo "Usage: $0 <yyyy-mm-dd> <hh:mm> <origine> <destination>"
+    echo -e "\e[33mUsage: $0 <yyyy-mm-dd> <hh:mm> <origine> <destination>\e[0m"
     exit 1
 fi
 
@@ -37,18 +37,15 @@ if [[ ! $TIME =~ $TIME_REGEX ]]; then
     exit 1
 fi
 
-# quelques variables
+# on met origine/destination dans des variables
 FROM_NAME="$3"
-FROM_LAT="43.61121"
-FROM_LON="1.45362"
-
-
 TO_NAME="$4"
 
 # Récupere les coordonnées long/lat de la gare de départ
-#read FROM_LON FROM_LAT < <(grep $FROM_NAME gares.csv | perl -ne 'print "$1 $2\n" if /\[(\d\.\d{5}).*(\d{2}\.\d{5})/')
+read FROM_LON FROM_LAT < <(perl -ne 'print "$1 $2\n" if /\Q${FROM_NAME}\E.*\[(\d\.\d{5}).*(\d{2}\.\d{5})/' gares.csv)
+
 # Récupere l'UIC de la gare d'arrivée
-UIC=$(perl -ne "if (/\Q$4\E;.*?;(\d*);/i) { print \$1 }" gares.csv) # /i case insensitive
+UIC=$(perl -ne "if (/\Q${TO_NAME}\E;.*?;(\d*);/i) { print \$1 }" gares.csv) # /i case insensitive
 TO_ID="STOPAREA|LIO:StopArea:OCE$UIC"
 
 # j'aime trop curl c'est trop fort
@@ -80,7 +77,7 @@ curl 'https://plan.lio-occitanie.fr/fr/itineraire' -X POST \
 --data-urlencode "widgetContext=false" \
 --data-urlencode "layoutMode=TRANSPORT" \
 -o lio.raw \
--s #-v -i -w "DNS: %{time_namelookup} Connect: %{time_connect} PreTransfer: %{time_pretransfer} StartTransfer: %{time_starttransfer} Total: %{time_total}\n"
+-s # -i -w "DNS: %{time_namelookup} Connect: %{time_connect} PreTransfer: %{time_pretransfer} StartTransfer: %{time_starttransfer} Total: %{time_total}\n"
 
 perl -ne '
     print "$1\n" if /"content":"(.*)"}/
@@ -92,9 +89,9 @@ perl -CSD -pe '
     s/\\n//g
 ' lio.rawhtml > lio.html
 
-ERROR_MSG=$(grep -E "(Le calcul d'itinéraire n'a pas trouvé de résultat pour votre demande|Aucun itinéraire disponible pour le moment)" lio.html)
+ERROR_MSG=$(grep -oE "(Le calcul d'itinéraire n'a pas trouvé de résultat pour votre demande|Aucun itinéraire disponible pour le moment)" lio.html)
 if [ -n "$ERROR_MSG" ]; then
-    echo "$ERROR_MSG."
+    echo -e "\e[31m$ERROR_MSG\e[0m"
 else
     read START END < <(perl -0777 -ne 'print "$1 $2\n" if /(\d{2}:\d{2})\..*?(\d{2}:\d{2})/' lio.html)
     START_SEC=$(date -d "$START" +%s)
@@ -112,5 +109,5 @@ else
 fi
 
 rm lio.raw
-#rm lio.rawhtml
-#rm lio.html
+rm lio.rawhtml
+rm lio.html
