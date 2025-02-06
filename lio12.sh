@@ -76,6 +76,7 @@ read FROM_LON FROM_LAT < <(perl -ne 'print "$1 $2\n" if /\Q${FROM_NAME}\E.*\[(\d
 # Récupere l'UIC de la gare d'arrivée
 UIC=$(perl -ne "if (/\Q${TO_NAME}\E;.*?;(\d*);/i) { print \$1 }" gares.csv) # /i case insensitive
 TO_ID="STOPAREA|LIO:StopArea:OCE$UIC"
+currentURL="https://plan.lio-occitanie.fr/fr/itineraire?fi=$FROM_ID&fv=$FROM_NAME&flat=$FROM_LAT&flon=$FROM_LON&ti=$TO_ID&tv=$TO_NAME&tlat=&tlon=&dt=${DATE}T$TIME&ws=1&bs=&a=false&sl=false&ad=false&df=true&v=&c=FASTEST&m=train"
 
 # j'aime trop curl c'est trop fort
 curl 'https://plan.lio-occitanie.fr/fr/itineraire' -X POST \
@@ -102,7 +103,7 @@ curl 'https://plan.lio-occitanie.fr/fr/itineraire' -X POST \
 --data-urlencode "accessible=false" \
 --data-urlencode "avoidDisruptions=false" \
 --data-urlencode "criterion=FASTEST" \
---data-urlencode "currentUrl=https://plan.lio-occitanie.fr/fr/itineraire?fi=$FROM_ID&fv=$FROM_NAME&flat=$FROM_LAT&flon=$FROM_LON&ti=$TO_ID&tv=$TO_NAME&tlat=&tlon=&dt=${DATE}T$TIME&ws=1&bs=&a=false&sl=false&ad=false&df=true&v=[]&c=FASTEST&m=train" \
+--data-urlencode "currentUrl=$currentURL" \
 --data-urlencode "widgetContext=false" \
 --data-urlencode "layoutMode=TRANSPORT" \
 -o lio.raw \
@@ -127,6 +128,9 @@ else
         echo "${FROM_NAME[@]^}->${TO_NAME[@]^} [$START]->[$END] (${HOURS}h${MINUTES}min)"
     fi
 fi
+
+echo
+echo $currentURL
 
 rm lio.raw
 rm lio.rawhtml
