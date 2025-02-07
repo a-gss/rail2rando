@@ -71,7 +71,9 @@ if [ ! -f gares.csv ]; then
 fi
 
 # Récupere les coordonnées long/lat de la gare de départ
-read FROM_LON FROM_LAT < <(perl -ne 'print "$1 $2\n" if /\Q${FROM_NAME}\E.*\[(\d\.\d{5}).*(\d{2}\.\d{5})/' gares.csv)
+FROM_DATA=$(cat gares.csv | grep -io "${FROM_NAME}".*)
+FROM_LON=$(echo "$FROM_DATA" | perl -ne 'print "$1\n" if /\[(\d+\.\d+), (\d+\.\d+)\]/')
+FROM_LAT=$(echo "$FROM_DATA" | perl -ne 'print "$2\n" if /\[(\d+\.\d+), (\d+\.\d+)\]/')
 
 # Récupere l'UIC de la gare d'arrivée
 UIC=$(perl -ne "if (/\Q${TO_NAME}\E;.*?;(\d*);/i) { print \$1 }" gares.csv) # /i case insensitive
@@ -91,11 +93,14 @@ curl 'https://plan.lio-occitanie.fr/fr/itineraire' -X POST \
 --data-urlencode "from[longitude]=$FROM_LON" \
 --data-urlencode "to[id]=$TO_ID" \
 --data-urlencode "to[value]=$TO_NAME" \
---data-urlencode "to[latitude]=" \
---data-urlencode "to[longitude]=" \
 --data-urlencode "departureDateTime=${DATE}T$TIME" \
---data-urlencode "arrivalDateTime=" \
+--data-urlencode "currentUrl=$currentURL" \
 --data-urlencode "modes[]=TRAIN" \
+--data-urlencode "modes[]=TRAM" \
+--data-urlencode "modes[]=METRO" \
+--data-urlencode "modes[]=BUS" \
+--data-urlencode "modes[]=WALK" \
+--data-urlencode "modes[]=AERIALLIFT" \
 --data-urlencode "walk[speed]=1" \
 --data-urlencode "bike[speed]=" \
 --data-urlencode "displayFacilities=true" \
@@ -103,7 +108,6 @@ curl 'https://plan.lio-occitanie.fr/fr/itineraire' -X POST \
 --data-urlencode "accessible=false" \
 --data-urlencode "avoidDisruptions=false" \
 --data-urlencode "criterion=FASTEST" \
---data-urlencode "currentUrl=$currentURL" \
 --data-urlencode "widgetContext=false" \
 --data-urlencode "layoutMode=TRANSPORT" \
 -o lio.raw \
