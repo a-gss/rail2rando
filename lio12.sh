@@ -8,6 +8,7 @@ usage() {
     echo " <destination>             Nom de la gare d'arrivée (insensible à la casse)"
     echo
     echo "Options :"
+    echo " -b, --bus                 Ajoute les bus dans le calcul d'itinéraire (le calcul sera plus long mais plus précis)"
     echo " -d, --date <yyyy-mm-dd>   Précise la date de départ (défaut: aujourd'hui)"
     echo " -h, --heure <hh:mm>       Précise l'heure de départ (défaut: 00:00)"
     echo "     --help                Affiche ce texte"
@@ -15,19 +16,20 @@ usage() {
     echo "Exemples:"
     echo " $0 Toulouse Figeac"
     echo " $0 -d 2025-09-25 cahors saint-gaudens"
-    echo " $0 -h 09:45 cahors saint-agne"
-    echo " $0 --date 2025-04-16 --heure 09:45 Toulouse Figeac"
+    echo " $0 -h 09:45 -b cahors saint-agne"
+    echo " $0 --bus --date 2025-04-16 --heure 09:45 Toulouse Figeac"
     exit 1
 }
 
 # Valeurs par défaut
 DATE=$(date +%F)  # Aujourd'hui
 HEURE="00:00"     # Minuit
+BUS_OPTION=""
 
 # Lecture des options
 while [[ $# -gt 0 ]]; do
     case "$1" in
-         -d|--date)
+        -d|--date)
             if [[ -n "$2" && "$2" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
                 DATE="$2"
                 shift 2  # Passe à l'argument suivant
@@ -45,10 +47,15 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi ;;
 
+        -b|--bus)
+            BUS="BUS"
+            shift ;;  # Passe à l'argument suivant
+
         --help)
             usage ;;
 
         --) shift; break ;;  # Fin des options
+
         -*) echo -e "\e[31mOption invalide : \e[33m$1\e[0m"; exit 1 ;;
         *) break ;;  # Arrête si c'est un argument non optionnel
     esac
@@ -94,13 +101,9 @@ curl 'https://plan.lio-occitanie.fr/fr/itineraire' -X POST \
 --data-urlencode "to[id]=$TO_ID" \
 --data-urlencode "to[value]=$TO_NAME" \
 --data-urlencode "departureDateTime=${DATE}T$TIME" \
---data-urlencode "currentUrl=$currentURL" \
 --data-urlencode "modes[]=TRAIN" \
---data-urlencode "modes[]=TRAM" \
---data-urlencode "modes[]=METRO" \
---data-urlencode "modes[]=BUS" \
 --data-urlencode "modes[]=WALK" \
---data-urlencode "modes[]=AERIALLIFT" \
+--data-urlencode "modes[]=${BUS}" \
 --data-urlencode "walk[speed]=1" \
 --data-urlencode "bike[speed]=" \
 --data-urlencode "displayFacilities=true" \
@@ -108,13 +111,14 @@ curl 'https://plan.lio-occitanie.fr/fr/itineraire' -X POST \
 --data-urlencode "accessible=false" \
 --data-urlencode "avoidDisruptions=false" \
 --data-urlencode "criterion=FASTEST" \
+--data-urlencode "currentUrl=$currentURL" \
 --data-urlencode "widgetContext=false" \
 --data-urlencode "layoutMode=TRANSPORT" \
 -o lio.raw \
--s # -i -w "DNS: %{time_namelookup} Connect: %{time_connect} PreTransfer: %{time_pretransfer} StartTransfer: %{time_starttransfer} Total: %{time_total}\n"
+-s #-i -w "DNS: %{time_namelookup} Connect: %{time_connect} PreTransfer: %{time_pretransfer} StartTransfer: %{time_starttransfer} Total: %{time_total}\n"
 
-perl -ne 'print "$1\n" if /"content":"(.*)"}/' lio.raw > lio.rawhtml
-perl -CSD -pe 's/\\u([0-9a-fA-F]{4})/chr(hex($1))/ge; s!\\/!/!g; s/\\n//g' lio.rawhtml > lio.html
+perl -ne 'print "$1\n" if /"content":"(.*)"}/' lio.raw > lio.rawhtml # on recupere que la partie "content" de la réponse
+perl -CSD -pe 's/\\u([0-9a-fA-F]{4})/chr(hex($1))/ge; s!\\/!/!g; s/\\n//g' lio.rawhtml > lio.html # conversion unicode \u0261 en caratères spéciaux
 
 ERROR_MSG=$(grep -oE "(Le calcul d'itinéraire n'a pas trouvé de résultat pour votre demande|Aucun itinéraire disponible pour le moment)" lio.html)
 if [ -n "$ERROR_MSG" ]; then
@@ -134,7 +138,7 @@ else
 fi
 
 echo
-echo $currentURL
+echo -e "\e[36mLIO: $currentURL\e[0m"
 
 rm lio.raw
 rm lio.rawhtml
