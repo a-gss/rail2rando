@@ -12,19 +12,21 @@ usage() {
     echo " -d, --date <yyyy-mm-dd>   Précise la date de départ (défaut: aujourd'hui)"
     echo " -h, --heure <hh:mm>       Précise l'heure de départ (défaut: 00:00)"
     echo "     --help                Affiche ce texte"
+    echo " -l, --lio                 Affiche le lien LIO du trajet"
     echo
     echo "Exemples:"
-    echo " $0 Toulouse Figeac"
+    echo " $0 Matabiau Figeac"
     echo " $0 -d 2025-09-25 cahors saint-gaudens"
     echo " $0 -h 09:45 -b cahors saint-agne"
-    echo " $0 --bus --date 2025-04-16 --heure 09:45 Toulouse Figeac"
+    echo " $0 --bus --date 2025-04-16 --heure 09:45 Matabiau Figeac"
     exit 1
 }
 
 # Valeurs par défaut
 DATE=$(date +%F)  # Aujourd'hui
-HEURE="00:00"     # Minuit
+TIME="00:00"     # Minuit
 BUS_OPTION=""
+LIOLINK=false
 
 # Lecture des options
 while [[ $# -gt 0 ]]; do
@@ -40,7 +42,7 @@ while [[ $# -gt 0 ]]; do
 
         -h|--heure)
             if [[ -n "$2" && "$2" =~ ^[0-9]{2}:[0-9]{2}$ ]]; then
-                HEURE="$2"
+                TIME="$2"
                 shift 2  # Passe à l'argument suivant
             else
                 echo -e "\e[31mErreur: Format d'horaire invalide. Utilisez <hh:mm>.\e[0m"
@@ -48,16 +50,24 @@ while [[ $# -gt 0 ]]; do
             fi ;;
 
         -b|--bus)
-            BUS="BUS"
+            BUS="BUS"  # Active l'option bus
             shift ;;  # Passe à l'argument suivant
+
+        -l|--lio)
+            LIOLINK=true
+            shift ;;
 
         --help)
             usage ;;
 
         --) shift; break ;;  # Fin des options
 
-        -*) echo -e "\e[31mOption invalide : \e[33m$1\e[0m"; exit 1 ;;
-        *) break ;;  # Arrête si c'est un argument non optionnel
+        -*)
+            echo -e "\e[31mOption invalide : \e[33m$1\e[0m"
+            exit 1 ;;
+
+        *)
+            break ;;  # Arrête dès qu'un argument non-optionnel est rencontré
     esac
 done
 
@@ -79,13 +89,22 @@ fi
 
 # Récupere les coordonnées long/lat de la gare de départ
 FROM_DATA=$(cat gares.csv | grep -io "${FROM_NAME}".*)
+if [[ -z "$FROM_DATA" ]]; then
+    echo -e "\e[31mErreur: Aucune gare "${FROM_NAME}" n'a été trouvée.\e[0m"
+    exit 1
+fi
 FROM_LON=$(echo "$FROM_DATA" | perl -ne 'print "$1\n" if /\[(\d+\.\d+), (\d+\.\d+)\]/')
 FROM_LAT=$(echo "$FROM_DATA" | perl -ne 'print "$2\n" if /\[(\d+\.\d+), (\d+\.\d+)\]/')
 
 # Récupere l'UIC de la gare d'arrivée
 UIC=$(perl -ne "if (/\Q${TO_NAME}\E;.*?;(\d*);/i) { print \$1 }" gares.csv) # /i case insensitive
 TO_ID="STOPAREA|LIO:StopArea:OCE$UIC"
-currentURL="https://plan.lio-occitanie.fr/fr/itineraire?fi=$FROM_ID&fv=$FROM_NAME&flat=$FROM_LAT&flon=$FROM_LON&ti=$TO_ID&tv=$TO_NAME&tlat=&tlon=&dt=${DATE}T$TIME&ws=1&bs=&a=false&sl=false&ad=false&df=true&v=&c=FASTEST&m=train"
+currentURL="https://plan.lio-occitanie.fr/fr/itineraire?fi=$FROM_ID&fv=$FROM_NAME&flat=$FROM_LAT&flon=$FROM_LON&ti=$TO_ID&tv=$TO_NAME&tlat=&tlon=&dt=${DATE}T$TIME&ws=1&bs=&a=false&sl=false&ad=false&df=true&v=&c=FASTEST&m=train&m=walk&m=${BUS}"
+
+if [[ -z "$UIC" ]]; then
+    echo -e "\e[31mErreur: Aucune gare "${TO_NAME}" n'a été trouvée.\e[0m"
+    exit 1
+fi
 
 # j'aime trop curl c'est trop fort
 curl 'https://plan.lio-occitanie.fr/fr/itineraire' -X POST \
@@ -137,8 +156,11 @@ else
     fi
 fi
 
-echo
-echo -e "\e[36mLIO: $currentURL\e[0m"
+
+if [ "$LIOLINK" = true ]; then
+    echo
+    echo -e "\e[36mLIO: $currentURL\e[0m"
+fi
 
 rm lio.raw
 rm lio.rawhtml
@@ -146,6 +168,6 @@ rm lio.html
 
 # Affichage des valeurs pour debug
 # echo "Date : $DATE"
-# echo "Heure : $HEURE"
+# echo "Heure : $TIME"
 # echo "Origine : $FROM_NAME"
 # echo "Destination : $TO_NAME"
