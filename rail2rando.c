@@ -1,3 +1,7 @@
+/*/// TODO
+    - rajouter le prix du trajet ça peut être sympa https://ressources.data.sncf.com/explore/dataset/tarifs-ouigo/table/
+    - rajouter un warning "vous etes en train de calculer dans le passé"
+/*///
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,9 +14,16 @@
 #include <unistd.h>   // close(), lseek()
 #include <regex.h>
 
-#define info(...)     do { printf("[INFO] "    __VA_ARGS__); fflush(stdout); } while (0)
-#define warning(...)  do { printf("[WARNING] " __VA_ARGS__); fflush(stdout); } while (0)
-#define error(...)    do { printf("[ERROR] "   __VA_ARGS__); fflush(stdout); } while (0)
+#define RED     "\x1b[31m"
+#define GREEN   "\x1b[32m"
+#define YELLOW  "\x1b[33m"
+#define BLUE    "\x1b[34m"
+#define MAGENTA "\x1b[35m"
+#define CYAN    "\x1b[36m"
+#define RESET   "\x1b[0m"
+#define info(...) do { printf("[INFO] " __VA_ARGS__); fflush(stdout); } while (0)
+#define warning(...) do { printf(YELLOW "[WARNING] " __VA_ARGS__ RESET); fflush(stdout); } while (0)
+#define error(...) do { fprintf(stderr, RED "[ERROR] " __VA_ARGS__ RESET); fflush(stdout); } while (0)
 
 #include "gtfs.c"
 
@@ -66,7 +77,7 @@ int main(int argc, char **argv)
     strcpy(orig, argv[argc - 1]);
 
     // Get the options
-    // TODO: refaire avec un switch ? https://stackoverflow.com/a/17509552
+    // TODO: refaire avec un switch ? https://stackoverflow.com/a/17509552 ou bien avec getopt()
     for (int i=1; i < argc - 1; i++) {
         if ((strcmp(argv[i], "--bus") == 0)  || (strcmp(argv[i], "-b") == 0)) {
             flag_bus = true;
@@ -108,18 +119,23 @@ int main(int argc, char **argv)
     //  - files do not exist
     //  - files are older than the valid data (updated tout les 5 mois un truc comme ça)
     info("Downloading GTFS data... ");
-    //system("curl --parallel -L --create-dirs "
-    //   "-s -o GTFS/calendar.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/9bd5ef79fa139ccbce0511108584394b/download/' "
-    //   "-s -o GTFS/calendar_dates.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/d39dc8f4edb7fa0cb7ed377a4b0f11f6/download/' "
-    //   "-s -o GTFS/routes.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/92c45d9df99624d7e05e9ade35ba0ce8/download/' "
-    //   "-s -o GTFS/stop_times.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/3cc9124c230b72e07df09e27c59eba88/download/' "
-    //   "-s -o GTFS/stops.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/7068c8d492df76c5125fac081b5e09e9/download/' "
-    //   "-s -o GTFS/trips.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/7831854a320cbf4ea5b6b327cd4581af/download/' "
-    //);
-    puts("OK");
-
+    system("curl --parallel -L --create-dirs "
+       "-s -o GTFS/calendar.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/9bd5ef79fa139ccbce0511108584394b/download/' "
+       "-s -o GTFS/calendar_dates.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/d39dc8f4edb7fa0cb7ed377a4b0f11f6/download/' "
+       "-s -o GTFS/routes.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/92c45d9df99624d7e05e9ade35ba0ce8/download/' "
+       "-s -o GTFS/stop_times.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/3cc9124c230b72e07df09e27c59eba88/download/' "
+       "-s -o GTFS/stops.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/7068c8d492df76c5125fac081b5e09e9/download/' "
+       "-s -o GTFS/trips.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/7831854a320cbf4ea5b6b327cd4581af/download/' "
+    );
+    puts(GREEN "OK" RESET);
 
     // mmap() GTFS files for fast access
+    //  Bon je crois bien que le GTFS LIO-Occitanie c'est que les arrets de bus
+    //  il faut donc rajouter les TER et les intercités
+    //  https://ressources.data.sncf.com/explore/dataset/sncf-intercites-gtfs/information/
+    //  https://ressources.data.sncf.com/explore/dataset/sncf-ter-gtfs/information/
+    //  et bon les TGV aussi mais si tu prends un putain de TGV pour aller en rando je sais
+    //  pas cest quoi ton probleme
     char *gtfs_data[GTFS_FILE_NUMBER];
     gtfs_data[calendar] = mmap_gtfs("GTFS/calendar.txt");
     gtfs_data[calendar_dates] = mmap_gtfs("GTFS/calendar_dates.txt");
@@ -143,10 +159,33 @@ int main(int argc, char **argv)
 
 
     // 1. Find the ID of the stations
-    info("Searching for '%s' ID in stops.txt... ", orig);
+
+// je teste des trucs
+    char calendrier[3][64];
+    regex_wrapper("22/05/2024", "(.*)/(.*)/(.*)", 3, calendrier);
+
+    char prenom[1][64];
+    regex_wrapper("salut je mapelle eude", "eud", 0, prenom);
+
+    char eurg[1][64];
+    regex_wrapper("bleubleu 64 tata", "35", 0, eurg);
+
+    char tessst[1][64];
+    regex_wrapper("1203512,,VIVIEZ - Gare Sncf,arrêt commercial,44.55554000,2.21792000,,,0,12S03512,0", "1203512", 0, tessst);
+    regex_wrapper("1203512,,VIVIEZ - Gare Sncf,arrêt commercial,44.55554000,2.21792000,,,0,12S03512,0", "^([^,]*).*VIVIEZ", 1, tessst);
+
+    char stop_id_pattern2[64];
+    snprintf(stop_id_pattern2, sizeof(stop_id_pattern2), "^([^,]*).*%s", orig);
+    regex_wrapper("31S16535,,TOULOUSE - Matabiau Gare SNCF,,43.61110504,1.45252593,,,1,,0", stop_id_pattern2, 1, tessst);
+
+    return 0;
+
+
+/*
+    info("Searching for '%s' ID in '/GTFS/stops.txt'... ", orig);
     char stop_id_pattern[128];
     char stop_id[9] = "";
-    //snprintf(stop_id_pattern, sizeof(stop_id_pattern), "^([^,]*).*%s", orig);
+    snprintf(stop_id_pattern, sizeof(stop_id_pattern), "^([^,]*).*%s", orig);
 
     regex_t regex;
     if (regcomp(&regex, "31S16535", REG_EXTENDED) != 0) {
@@ -167,11 +206,12 @@ int main(int argc, char **argv)
         }
         line = strtok_r(NULL, "\n", &save_ptr);
     }
+    puts(RED "NOT FOUND" RESET);
 
 
 
     if (strcmp(stop_id, "31S16535") != 0)
-        error("pas le bon ID llolloll pont matabiau i guess\n");
+    //error("\npas le bon ID llolloll pont matabiau i guess\n");
 
 
 
@@ -183,19 +223,18 @@ int main(int argc, char **argv)
     int i;
     //printf("%s", gtfs_data[stops]);
     //while(1) {
-    //    if (gtfs_data[stops][i] == '\0') {
-    //        printf("\\0\n");
-    //        break;
-    //    } else if (gtfs_data[stops][i] == '\n') {
-    //        printf("\\n");
-    //    }
-    //    putchar(gtfs_data[stops][i]); // Access the data like an array
-    //    i++;
-    //}
-    //info("%s ID: %d\n", orig, 3);
+        //    if (gtfs_data[stops][i] == '\0') {
+            //        printf("\\0\n");
+            //        break;
+            //    } else if (gtfs_data[stops][i] == '\n') {
+                //        printf("\\n");
+                //    }
+                //    putchar(gtfs_data[stops][i]); // Access the data like an array
+                //    i++;
+                //}
+                //info("%s ID: %d\n", orig, 3);
 
-
-
+*/
 
 
     // ----------------------------------------------------------
