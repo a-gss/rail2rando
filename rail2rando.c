@@ -2,6 +2,7 @@
     - rajouter le prix du trajet ça peut être sympa https://ressources.data.sncf.com/explore/dataset/tarifs-ouigo/table/
     - rajouter un warning "vous etes en train de calculer dans le passé"
 /*///
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,10 +23,19 @@
 #define CYAN    "\x1b[36m"
 #define RESET   "\x1b[0m"
 #define info(...) do { printf("[INFO] " __VA_ARGS__); fflush(stdout); } while (0)
-#define warning(...) do { printf(YELLOW "[WARNING] " __VA_ARGS__ RESET); fflush(stdout); } while (0)
-#define error(...) do { fprintf(stderr, RED "[ERROR] " __VA_ARGS__ RESET); fflush(stdout); } while (0)
+#define warning(...) do { printf(YELLOW "[WARNING] " RESET __VA_ARGS__); fflush(stdout); } while (0)
+static inline void error(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    fprintf(stderr, RED "[ERROR] ");
+    vfprintf(stderr, fmt, args);
+    fprintf(stderr, RESET "\n");
+    va_end(args);
+    fflush(stdout);
+}
 
 #include "gtfs.c"
+#include "regex.c"
 
 void help(char **argv) {
     printf("Usage : %s [options...] <origine>\n\n"
@@ -45,7 +55,7 @@ void help(char **argv) {
             " %s Matabiau\n"
             " %s -d 2025-09-25 --dest cahors saint-gaudens\n"
             " %s -h 09:45 -b --dest cahors saint-agne\n"
-            " %s --bus --date 2025-04-16 --heure 09:45 --dest Matabiau --link Figeac\n",
+            " %s --bus -v --date 2025-04-16 --heure 09:45 --dest Matabiau --link Figeac\n",
             argv[0],
             argv[0],
             argv[0],
@@ -68,7 +78,7 @@ int main(int argc, char **argv)
     strftime(date, sizeof(date), "%F", localtime(&(time_t){time(NULL)}));
 
     if (argc == 1) {
-        error("Vous devez spécifier une gare de départ <origine>.\n");
+        error("Vous devez spécifier une gare de départ <origine>.");
         help(argv);
         return EXIT_FAILURE;
     }
@@ -99,13 +109,13 @@ int main(int argc, char **argv)
             flag_link_lio = true;
 
         } else {
-            error("Invalid option.\n");
+            error("Option invalide '%s'.", argv[i]);
             help(argv);
             return EXIT_FAILURE;
         }
     }
 
-    info("Depart de %s à %s le %s\n", orig, heure, date);
+    info("Départ de " YELLOW "%s" RESET " à %s le %s\n", orig, heure, date);
     ///info("%s->%s [10:52]->[14:26] (3h34min)\n", orig, dest);
 
     // debug
@@ -119,14 +129,14 @@ int main(int argc, char **argv)
     //  - files do not exist
     //  - files are older than the valid data (updated tout les 5 mois un truc comme ça)
     info("Downloading GTFS data... ");
-    system("curl --parallel -L --create-dirs "
-       "-s -o GTFS/calendar.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/9bd5ef79fa139ccbce0511108584394b/download/' "
-       "-s -o GTFS/calendar_dates.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/d39dc8f4edb7fa0cb7ed377a4b0f11f6/download/' "
-       "-s -o GTFS/routes.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/92c45d9df99624d7e05e9ade35ba0ce8/download/' "
-       "-s -o GTFS/stop_times.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/3cc9124c230b72e07df09e27c59eba88/download/' "
-       "-s -o GTFS/stops.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/7068c8d492df76c5125fac081b5e09e9/download/' "
-       "-s -o GTFS/trips.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/7831854a320cbf4ea5b6b327cd4581af/download/' "
-    );
+    //system("curl --parallel -L --create-dirs "
+    //   "-s -o GTFS/calendar.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/9bd5ef79fa139ccbce0511108584394b/download/' "
+    //   "-s -o GTFS/calendar_dates.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/d39dc8f4edb7fa0cb7ed377a4b0f11f6/download/' "
+    //   "-s -o GTFS/routes.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/92c45d9df99624d7e05e9ade35ba0ce8/download/' "
+    //   "-s -o GTFS/stop_times.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/3cc9124c230b72e07df09e27c59eba88/download/' "
+    //   "-s -o GTFS/stops.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/7068c8d492df76c5125fac081b5e09e9/download/' "
+    //   "-s -o GTFS/trips.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/7831854a320cbf4ea5b6b327cd4581af/download/' "
+    //);
     puts(GREEN "OK" RESET);
 
     // mmap() GTFS files for fast access
@@ -136,13 +146,12 @@ int main(int argc, char **argv)
     //  https://ressources.data.sncf.com/explore/dataset/sncf-ter-gtfs/information/
     //  et bon les TGV aussi mais si tu prends un putain de TGV pour aller en rando je sais
     //  pas cest quoi ton probleme
-    char *gtfs_data[GTFS_FILE_NUMBER];
-    gtfs_data[calendar] = mmap_gtfs("GTFS/calendar.txt");
-    gtfs_data[calendar_dates] = mmap_gtfs("GTFS/calendar_dates.txt");
-    gtfs_data[routes] = mmap_gtfs("GTFS/routes.txt");
-    gtfs_data[stop_times] = mmap_gtfs("GTFS/stop_times.txt");
-    gtfs_data[stops] = mmap_gtfs("GTFS/stops.txt");
-    gtfs_data[trips] = mmap_gtfs("GTFS/trips.txt");
+    char *gtfs[GTFS_FILE_NUMBER];
+    //gtfs[calendar] = mmap_gtfs("GTFS/calendar.txt");
+    //gtfs[calendar_dates] = mmap_gtfs("GTFS/calendar_dates.txt");
+    //gtfs[routes] = mmap_gtfs("GTFS/routes.txt");
+    //gtfs[stop_times] = mmap_gtfs("GTFS/stop_times.txt");
+    //gtfs[trips] = mmap_gtfs("GTFS/trips.txt");
 
 
     /*///   1. Find the ID of the stations
@@ -159,26 +168,22 @@ int main(int argc, char **argv)
 
 
     // 1. Find the ID of the stations
+    gtfs[stops] = mmap_gtfs(gtfs_filepath[stops]);
 
-// je teste des trucs
-    char calendrier[3][64];
-    regex_wrapper("22/05/2024", "(.*)/(.*)/(.*)", 3, calendrier);
+    char stop_id_pattern[64];
+    char stop_id[1][64];
+    snprintf(stop_id_pattern, sizeof(stop_id_pattern), "^([^,]*).*%s", orig); // TODO pas sur de sizeof là c'est pas juste la taille du type ?
 
-    char prenom[1][64];
-    regex_wrapper("salut je mapelle eude", "eud", 0, prenom);
+    info("Searching for '%s' in '%s'... ", stop_id_pattern, gtfs_filepath[stops]);
+    if (regex_find_mmaped(stop_id_pattern, gtfs[stops], 1, stop_id) == true) {
+        info("%s STOP_ID: %s\n", orig, stop_id[0]);
 
-    char eurg[1][64];
-    regex_wrapper("bleubleu 64 tata", "35", 0, eurg);
+    } else {
+        error("Aucun résultat trouvé pour '%s'.", stop_id_pattern);
+        exit(EXIT_FAILURE);
+    }
+    munmap_gtfs(gtfs_filepath[stops], gtfs[stops]);
 
-    char tessst[1][64];
-    regex_wrapper("1203512,,VIVIEZ - Gare Sncf,arrêt commercial,44.55554000,2.21792000,,,0,12S03512,0", "1203512", 0, tessst);
-    regex_wrapper("1203512,,VIVIEZ - Gare Sncf,arrêt commercial,44.55554000,2.21792000,,,0,12S03512,0", "^([^,]*).*VIVIEZ", 1, tessst);
-
-    char stop_id_pattern2[64];
-    snprintf(stop_id_pattern2, sizeof(stop_id_pattern2), "^([^,]*).*%s", orig);
-    regex_wrapper("31S16535,,TOULOUSE - Matabiau Gare SNCF,,43.61110504,1.45252593,,,1,,0", stop_id_pattern2, 1, tessst);
-
-    return 0;
 
 
 /*
@@ -222,29 +227,30 @@ int main(int argc, char **argv)
 
     int i;
     //printf("%s", gtfs_data[stops]);
-    //while(1) {
-        //    if (gtfs_data[stops][i] == '\0') {
-            //        printf("\\0\n");
-            //        break;
-            //    } else if (gtfs_data[stops][i] == '\n') {
-                //        printf("\\n");
-                //    }
-                //    putchar(gtfs_data[stops][i]); // Access the data like an array
-                //    i++;
-                //}
-                //info("%s ID: %d\n", orig, 3);
+    while(1) {
+        if (gtfs_data[stops][i] == '\0') {
+            printf("\\0\n");
+            break;
+        } else if (gtfs_data[stops][i] == '\n') {
+            printf("\\n");
+        }
+        putchar(gtfs_data[stops][i]); // Access the data like an array
+        i++;
+    }
+    info("%s ID: %d\n", orig, 3);
 
 */
 
 
     // ----------------------------------------------------------
     // Unmap GTFS files when done
-    munmap_gtfs("GTFS/calendar.txt");
-    munmap_gtfs("GTFS/calendar_dates.txt");
-    munmap_gtfs("GTFS/routes.txt");
-    munmap_gtfs("GTFS/stop_times.txt");
-    munmap_gtfs("GTFS/stops.txt");
-    munmap_gtfs("GTFS/trips.txt");
+
+    //munmap_gtfs(gtfs_filepath[calendar], gtfs[calendar]);
+    //munmap_gtfs(gtfs_filepath[calendar_dates], gtfs[calendar_dates]);
+    //munmap_gtfs(gtfs_filepath[routes], gtfs[routes]);
+    //munmap_gtfs(gtfs_filepath[stop_times], gtfs[stop_times]);
+    //munmap_gtfs(gtfs_filepath[stops], gtfs[stops]);
+    //munmap_gtfs(gtfs_filepath[trips], gtfs[trips]);
     printf("-----------------------------------------------------\n");
     return EXIT_SUCCESS;
 }
