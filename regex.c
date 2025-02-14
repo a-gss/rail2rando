@@ -1,88 +1,74 @@
 #pragma once
 
-bool regex_wrapper(const char *str, const char *pattern,
-                   int n_capturing_group, char result[][64])
+bool regex_match(const char *str, regex_t *regex, int n_capturing_group, char result[][64])
 {
-    regex_t regex;
-    regmatch_t matches[n_capturing_group + 1];  // Index 0 = match complet
+    regmatch_t matches[n_capturing_group + 1];  // Index 0 = full match
 
-    if (regcomp(&regex, pattern, REG_EXTENDED) != 0) {
-        error("Erreur de compilation du regex");
-        return false;
-    }
-
-    if (regexec(&regex, str, n_capturing_group + 1, matches, 0) == 0) {
+    if (regexec(regex, str, n_capturing_group + 1, matches, 0) == 0) {
         if (n_capturing_group == 0) {
-            // Si aucun groupe capturant, récupérer le match complet
-            int debut = matches[0].rm_so;
-            int fin = matches[0].rm_eo;
-            int len = fin - debut;
+            int start = matches[0].rm_so;
+            int end = matches[0].rm_eo;
+            int len = end - start;
 
-            strncpy(result[0], str + debut, len);
+            strncpy(result[0], str + start, len);
             result[0][len] = '\0';
             printf(GREEN "MATCH: %s\n" RESET, result[0]);
 
-        } else { // Boucle sur les groupes capturés
+        } else {
             printf(GREEN "MATCH: ");
             for (int i = 1; i <= n_capturing_group; i++) {
-                if (matches[i].rm_so != -1) { // Vérifie si le groupe est capturé
-                    int debut = matches[i].rm_so;
-                    int fin = matches[i].rm_eo;
-                    int len = fin - debut;
+                if (matches[i].rm_so != -1) {
+                    int start = matches[i].rm_so;
+                    int end = matches[i].rm_eo;
+                    int len = end - start;
 
-                    strncpy(result[i-1], str + debut, len);
-                    result[i-1][len] = '\0';
+                    strncpy(result[i - 1], str + start, len);
+                    result[i - 1][len] = '\0';
 
-                    (n_capturing_group > 1) ? printf("(%d)%s ", i, result[i-1])
-                                            : printf("%s ", result[i-1]);
+                    (n_capturing_group > 1) ? printf("(%d)%s ", i, result[i - 1])
+                                            : printf("%s ", result[i - 1]);
                 }
             }
             puts(RESET);
+        }
+        info("Regex found in '%s'\n", str);
+        return true;
+    }
+
+    return false;
+}
+
+
+bool regex_find(const char *pattern, char *mmaped_data, int n_capturing_group, char result[][64])
+{
+    regex_t regex;
+    if (regcomp(&regex, pattern, REG_EXTENDED) != 0) {
+        error("Erreur de compilation du regex '%s'", pattern);
+        return false;
+    }
+
+    char *eof = memchr(mmaped_data, '\0', SIZE_MAX); // Find the end of the file
+    char *start = mmaped_data; // Start at the beginning
+
+    while (start < eof) {
+        // Extract the line
+        char * end = memchr(start, '\n', eof - start);
+        size_t len = end - start;
+        char *line = malloc(len + 1); // + \0
+        line = memcpy(line, start, len);
+        line[len-1] = '\0'; // remove the \n from the string
+        start = end + 1;    // move to the next line
+
+        if (regex_match(line, &regex, n_capturing_group, result)) {
+            free(line);
             regfree(&regex);
             return true;
         }
 
-    } else {
-        regfree(&regex);
-        return false;
+        free(line);
     }
-}
 
-bool regex_find_mmaped(const char *pattern, char *mmaped_data,
-                       int n_capturing_group, char result[][64])
-{
-    int i = 0;
-    int j = 0;
-    char line[256] = {};
-    while(mmaped_data[i] != '\0') {
-        if (mmaped_data[i] == '\r') {           // saloperie de windows de merde
-            i++;
-            continue;
-        }
-
-        if (mmaped_data[i] == '\n') {           // end of line
-            line[j] = '\0';                     // null terminate the line
-            if (regex_wrapper(line, pattern, n_capturing_group, result) == true) {
-                return true;
-            } else {
-                i++;                            // move to the next line
-                j = 0;
-                //memset(line, 0, sizeof(line));  // reset the line
-                //line[0] = '\0';
-                // TODO: a-t-on vraiment besoin de reset la ligne ? ...
-                continue;
-            }
-        } else {
-            line[j] = mmaped_data[i];           // store the character
-            i++;
-            j++;
-
-            if (j >= sizeof(line) - 1) {        // Prevent buffer overflow
-                error("Mon gars ça overflow de malade là");
-                exit(EXIT_FAILURE);
-            }
-        }
-    }
+    regfree(&regex);
     puts(RED "NO MATCH" RESET);
     return false;
 }

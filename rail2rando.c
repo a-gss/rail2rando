@@ -4,6 +4,7 @@
 /*///
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -172,16 +173,17 @@ int main(int argc, char **argv)
 
     char stop_id_pattern[64];
     char stop_id[1][64];
-    snprintf(stop_id_pattern, sizeof(stop_id_pattern), "^([^,]*).*%s", orig); // TODO pas sur de sizeof là c'est pas juste la taille du type ?
+    snprintf(stop_id_pattern, sizeof(stop_id_pattern), "^([^,]*).*%s", orig);
 
     info("Searching for '%s' in '%s'... ", stop_id_pattern, gtfs_filepath[stops]);
-    if (regex_find_mmaped(stop_id_pattern, gtfs[stops], 1, stop_id) == true) {
+    if (regex_find(stop_id_pattern, gtfs[stops], 1, stop_id) == true) {
         info("%s STOP_ID: %s\n", orig, stop_id[0]);
 
     } else {
         error("Aucun résultat trouvé pour '%s'.", stop_id_pattern);
         exit(EXIT_FAILURE);
     }
+
     munmap_gtfs(gtfs_filepath[stops], gtfs[stops]);
 
 
