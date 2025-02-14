@@ -28,8 +28,8 @@ char *mmap_gtfs(char *filepath)
 {
     info("Mapping '%s' into memory... ", filepath);
 
-    // Open the file in read/write
-    int fd = open(filepath, O_RDWR);
+    // Open the file in read only
+    int fd = open(filepath, O_RDONLY);
     if (fd == -1) {
         perror("Error opening file");
         exit(EXIT_FAILURE);
@@ -42,8 +42,8 @@ char *mmap_gtfs(char *filepath)
         exit(EXIT_FAILURE);
     }
 
-    // Mapping into memory: read/write, shared to other processes
-    char *mmapped = mmap(NULL, file_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    // Mapping into memory: read, shared to other processes
+    char *mmapped = mmap(NULL, file_size, PROT_READ, MAP_SHARED, fd, 0);
     if (mmapped == MAP_FAILED) {
         perror("Error mapping file");
         close(fd);

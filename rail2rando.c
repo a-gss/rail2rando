@@ -24,16 +24,19 @@
 #define CYAN    "\x1b[36m"
 #define RESET   "\x1b[0m"
 #define info(...) do { printf("[INFO] " __VA_ARGS__); fflush(stdout); } while (0)
-#define warning(...) do { printf(YELLOW "[WARNING] " RESET __VA_ARGS__); fflush(stdout); } while (0)
-static inline void error(const char *fmt, ...) {
+#define error(...) logger(RED, "[ERROR] ", __VA_ARGS__)
+#define warning(...) logger(MAGENTA, "[WARNING] ", __VA_ARGS__)
+
+static inline void logger(const char *color, const char *level, const char *format, ...) {
     va_list args;
-    va_start(args, fmt);
-    fprintf(stderr, RED "[ERROR] ");
-    vfprintf(stderr, fmt, args);
-    fprintf(stderr, RESET "\n");
+    printf("%s%s", color, level); // Print the color and level
+    va_start(args, format); // Start processing the variadic arguments
+    vprintf(format, args);  // Print the actual log message using the format string and arguments
     va_end(args);
+    puts(RESET); // Reset color and add newline
     fflush(stdout);
 }
+
 
 #include "gtfs.c"
 #include "regex.c"
@@ -62,6 +65,27 @@ void help(char **argv) {
             argv[0],
             argv[0],
             argv[0]
+    );
+}
+
+void download_gtfs() {
+    // TODO: only download if:
+    //  - files do not exist
+    //  - files are older than the valid data (updated tout les 5 mois un truc comme ça)
+    info("Downloading GTFS data...\n");
+    system("rm -rf GTFS");
+    system("curl --parallel -L --create-dirs "
+        "--resolve data.laregion.fr:443:109.232.232.161 "
+        "-H 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:134.0) Gecko/20100101 Firefox/134.0' "
+        "-H 'X-Requested-With: XMLHttpRequest' "
+        "-H 'Connection: keep-alive' "
+        "-s -o GTFS/calendar.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/9bd5ef79fa139ccbce0511108584394b/download/' "
+        "-s -o GTFS/calendar_dates.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/d39dc8f4edb7fa0cb7ed377a4b0f11f6/download/' "
+        "-s -o GTFS/routes.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/92c45d9df99624d7e05e9ade35ba0ce8/download/' "
+        "-s -o GTFS/stop_times.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/3cc9124c230b72e07df09e27c59eba88/download/' "
+        "-s -o GTFS/stops.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/7068c8d492df76c5125fac081b5e09e9/download/' "
+        "-s -o GTFS/trips.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/7831854a320cbf4ea5b6b327cd4581af/download/' "
+        "-w '[INFO] %{filename_effective} (%{size_download} bytes) DNS: %{time_namelookup} Connect: %{time_connect} PreTransfer: %{time_pretransfer} StartTransfer: %{time_starttransfer} Total: %{time_total} \x1b[32m OK \x1b[0m \n' "
     );
 }
 
@@ -126,19 +150,15 @@ int main(int argc, char **argv)
     //printf("heure: %s\n", heure);
     //return 0;
 
-    // TODO: only download if:
-    //  - files do not exist
-    //  - files are older than the valid data (updated tout les 5 mois un truc comme ça)
-    info("Downloading GTFS data... ");
-    //system("curl --parallel -L --create-dirs "
-    //   "-s -o GTFS/calendar.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/9bd5ef79fa139ccbce0511108584394b/download/' "
-    //   "-s -o GTFS/calendar_dates.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/d39dc8f4edb7fa0cb7ed377a4b0f11f6/download/' "
-    //   "-s -o GTFS/routes.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/92c45d9df99624d7e05e9ade35ba0ce8/download/' "
-    //   "-s -o GTFS/stop_times.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/3cc9124c230b72e07df09e27c59eba88/download/' "
-    //   "-s -o GTFS/stops.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/7068c8d492df76c5125fac081b5e09e9/download/' "
-    //   "-s -o GTFS/trips.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/7831854a320cbf4ea5b6b327cd4581af/download/' "
-    //);
-    puts(GREEN "OK" RESET);
+    for (int i = 0; i < GTFS_FILE_NUMBER; i++) {
+        if (access(gtfs_filepath[i], F_OK) != 0) {
+            download_gtfs();
+            break;
+
+        } else if (i == GTFS_FILE_NUMBER - 1) {
+            info("GTFS files found. Skipping download.\n");
+        }
+    }
 
     // mmap() GTFS files for fast access
     //  Bon je crois bien que le GTFS LIO-Occitanie c'est que les arrets de bus
@@ -181,78 +201,37 @@ int main(int argc, char **argv)
 
     } else {
         error("Aucun résultat trouvé pour '%s'.", stop_id_pattern);
-        exit(EXIT_FAILURE);
+        //exit(EXIT_FAILURE);
     }
 
     munmap_gtfs(gtfs_filepath[stops], gtfs[stops]);
 
+    // Juste pour benchmark le regex sur les fichiers
+    gtfs[calendar] = mmap_gtfs(gtfs_filepath[calendar]);
+    info("Searching for '%s' in '%s'... ", stop_id_pattern, gtfs_filepath[calendar]);
+    regex_find(stop_id_pattern, gtfs[calendar], 1, stop_id);
+    munmap_gtfs(gtfs_filepath[calendar], gtfs[calendar]);
 
+    gtfs[calendar_dates] = mmap_gtfs(gtfs_filepath[calendar_dates]);
+    info("Searching for '%s' in '%s'... ", stop_id_pattern, gtfs_filepath[calendar_dates]);
+    regex_find(stop_id_pattern, gtfs[calendar_dates], 1, stop_id);
+    munmap_gtfs(gtfs_filepath[calendar_dates], gtfs[calendar_dates]);
 
-/*
-    info("Searching for '%s' ID in '/GTFS/stops.txt'... ", orig);
-    char stop_id_pattern[128];
-    char stop_id[9] = "";
-    snprintf(stop_id_pattern, sizeof(stop_id_pattern), "^([^,]*).*%s", orig);
+    gtfs[routes] = mmap_gtfs(gtfs_filepath[routes]);
+    info("Searching for '%s' in '%s'... ", stop_id_pattern, gtfs_filepath[routes]);
+    regex_find(stop_id_pattern, gtfs[routes], 1, stop_id);
+    munmap_gtfs(gtfs_filepath[routes], gtfs[routes]);
 
-    regex_t regex;
-    if (regcomp(&regex, "31S16535", REG_EXTENDED) != 0) {
-        error("Impossible de compiler le regex.");
-        return EXIT_FAILURE;
-    }
+    gtfs[stop_times] = mmap_gtfs(gtfs_filepath[stop_times]);
+    info("Searching for '%s' in '%s'... ", stop_id_pattern, gtfs_filepath[stop_times]);
+    regex_find(stop_id_pattern, gtfs[stop_times], 1, stop_id);
+    munmap_gtfs(gtfs_filepath[stop_times], gtfs[stop_times]);
 
-    regmatch_t matches[2]; // Capture group for stop_id
-    char *save_ptr = NULL;
-    char *line = strtok_r(gtfs_data[stops], "\n", &save_ptr);
-    while (line) {
-        if (regexec(&regex, line, 2, matches, 0) == 0) {
-            int len = matches[1].rm_eo - matches[1].rm_so;
-            strncpy(stop_id, line + matches[1].rm_so, len);
-            stop_id[len] = '\0'; // Ensure null termination
-            printf("FOUND (%s)\n", stop_id);
-            break; // Stop after the first match
-        }
-        line = strtok_r(NULL, "\n", &save_ptr);
-    }
-    puts(RED "NOT FOUND" RESET);
+    gtfs[trips] = mmap_gtfs(gtfs_filepath[trips]);
+    info("Searching for '%s' in '%s'... ", stop_id_pattern, gtfs_filepath[trips]);
+    regex_find(stop_id_pattern, gtfs[trips], 1, stop_id);
+    munmap_gtfs(gtfs_filepath[trips], gtfs[trips]);
 
-
-
-    if (strcmp(stop_id, "31S16535") != 0)
-    //error("\npas le bon ID llolloll pont matabiau i guess\n");
-
-
-
-
-    regfree(&regex);
-    return 0;
-
-
-    int i;
-    //printf("%s", gtfs_data[stops]);
-    while(1) {
-        if (gtfs_data[stops][i] == '\0') {
-            printf("\\0\n");
-            break;
-        } else if (gtfs_data[stops][i] == '\n') {
-            printf("\\n");
-        }
-        putchar(gtfs_data[stops][i]); // Access the data like an array
-        i++;
-    }
-    info("%s ID: %d\n", orig, 3);
-
-*/
-
-
-    // ----------------------------------------------------------
-    // Unmap GTFS files when done
-
-    //munmap_gtfs(gtfs_filepath[calendar], gtfs[calendar]);
-    //munmap_gtfs(gtfs_filepath[calendar_dates], gtfs[calendar_dates]);
-    //munmap_gtfs(gtfs_filepath[routes], gtfs[routes]);
-    //munmap_gtfs(gtfs_filepath[stop_times], gtfs[stop_times]);
-    //munmap_gtfs(gtfs_filepath[stops], gtfs[stops]);
-    //munmap_gtfs(gtfs_filepath[trips], gtfs[trips]);
-    printf("-----------------------------------------------------\n");
+    printf("--------------------------------------------------------------------------------");
     return EXIT_SUCCESS;
 }
