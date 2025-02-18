@@ -37,7 +37,6 @@ static inline void logger(const char *color, const char *level, const char *form
     fflush(stdout);
 }
 
-
 #include "gtfs.c"
 #include "regex.c"
 
@@ -205,7 +204,6 @@ int main(int argc, char **argv)
     char **stop_id = NULL;
     unsigned int stop_id_count = 0;
     snprintf(stop_id_pattern, sizeof(stop_id_pattern), "^([^,]*).*%s.*Gare|^([^,]*).*Gare.*%s", orig.name, orig.name);
-    //snprintf(stop_id_pattern, sizeof(stop_id_pattern), "^([^,]*).*%s", orig.name);
 
     info("Searching for '%s' trainstations in '%s'... ", orig.name, gtfs_filepath[stops]);
     stop_id_count = regex_find(stop_id_pattern, gtfs[stops], 1, &stop_id);
@@ -235,39 +233,72 @@ int main(int argc, char **argv)
 
     info("%s STOP_ID: %s\n", orig.name, orig.stop_id);
 
+    // Juste pour benchmark le regex sur les fichiers
+    /*
+        gtfs[calendar] = mmap_gtfs(gtfs_filepath[calendar]);
+        info("Searching for '%s' in '%s'... ", stop_id_pattern, gtfs_filepath[calendar]);
+        regex_find(stop_id_pattern, gtfs[calendar], 1, stop_id);
+        munmap_gtfs(gtfs_filepath[calendar], gtfs[calendar]);
+
+        gtfs[calendar_dates] = mmap_gtfs(gtfs_filepath[calendar_dates]);
+        info("Searching for '%s' in '%s'... ", stop_id_pattern, gtfs_filepath[calendar_dates]);
+        regex_find(stop_id_pattern, gtfs[calendar_dates], 1, stop_id);
+        munmap_gtfs(gtfs_filepath[calendar_dates], gtfs[calendar_dates]);
+
+        gtfs[routes] = mmap_gtfs(gtfs_filepath[routes]);
+        info("Searching for '%s' in '%s'... ", stop_id_pattern, gtfs_filepath[routes]);
+        regex_find(stop_id_pattern, gtfs[routes], 1, stop_id);
+        munmap_gtfs(gtfs_filepath[routes], gtfs[routes]);
+
+        gtfs[stop_times] = mmap_gtfs(gtfs_filepath[stop_times]);
+        info("Searching for '%s' in '%s'... ", stop_id_pattern, gtfs_filepath[stop_times]);
+        regex_find(stop_id_pattern, gtfs[stop_times], 1, stop_id);
+        munmap_gtfs(gtfs_filepath[stop_times], gtfs[stop_times]);
+
+        gtfs[trips] = mmap_gtfs(gtfs_filepath[trips]);
+        info("Searching for '%s' in '%s'... ", stop_id_pattern, gtfs_filepath[trips]);
+        regex_find(stop_id_pattern, gtfs[trips], 1, stop_id);
+        munmap_gtfs(gtfs_filepath[trips], gtfs[trips]);
+    */
     munmap_gtfs(gtfs_filepath[stops], gtfs[stops]);
 
 
 
+    gtfs[trips] = mmap_gtfs(gtfs_filepath[trips]);
 
-// Juste pour benchmark le regex sur les fichiers
-/*
-    gtfs[calendar] = mmap_gtfs(gtfs_filepath[calendar]);
-    info("Searching for '%s' in '%s'... ", stop_id_pattern, gtfs_filepath[calendar]);
-    regex_find(stop_id_pattern, gtfs[calendar], 1, stop_id);
-    munmap_gtfs(gtfs_filepath[calendar], gtfs[calendar]);
+    char trip_id_pattern[] = "^[^,]*,[^,]*,([^,]*)"; // get trip_id field in trips.txt
+    char **trip_id_list;
 
-    gtfs[calendar_dates] = mmap_gtfs(gtfs_filepath[calendar_dates]);
-    info("Searching for '%s' in '%s'... ", stop_id_pattern, gtfs_filepath[calendar_dates]);
-    regex_find(stop_id_pattern, gtfs[calendar_dates], 1, stop_id);
-    munmap_gtfs(gtfs_filepath[calendar_dates], gtfs[calendar_dates]);
+    info("Searching for trips in '%s'... ", gtfs_filepath[trips]);
+    int trip_number = regex_find(trip_id_pattern, gtfs[trips], 1, &trip_id_list);
+    if (trip_number == 0) {
+        error("No trips found. That's weird, please check that the GTFS file is correct.");
+        exit(EXIT_FAILURE);
 
-    gtfs[routes] = mmap_gtfs(gtfs_filepath[routes]);
-    info("Searching for '%s' in '%s'... ", stop_id_pattern, gtfs_filepath[routes]);
-    regex_find(stop_id_pattern, gtfs[routes], 1, stop_id);
-    munmap_gtfs(gtfs_filepath[routes], gtfs[routes]);
+    } else {
+        info("%d trips found\n", trip_number);
+        gtfs[stop_times] = mmap_gtfs(gtfs_filepath[stop_times]);
 
-    gtfs[stop_times] = mmap_gtfs(gtfs_filepath[stop_times]);
-    info("Searching for '%s' in '%s'... ", stop_id_pattern, gtfs_filepath[stop_times]);
-    regex_find(stop_id_pattern, gtfs[stop_times], 1, stop_id);
+        // for each trip, we store all the stopping points
+        char **stop_list;
+        for (size_t i = 1; i < trip_number; i++) { // i = 0 is the first line which are csv column names
+            snprintf(stop_id_pattern, sizeof(stop_id_pattern), "^%s,[^,]*,[^,]*,([^,]*)", trip_id_list[i]);
+            char *escaped_stop_id_pattern = escape_regex(stop_id_pattern);
+
+            info("Trip [%s] ", trip_id_list[i]);
+            stop_id_count = regex_find(escaped_stop_id_pattern, gtfs[stop_times], 1, &stop_list);
+
+            for (int j = 0; j < stop_id_count; j++)
+                info("  Stop(%02d) %s\n", j+1, stop_list[j]);
+        }
+
+    }
+
+    munmap_gtfs(gtfs_filepath[trips], gtfs[trips]);
     munmap_gtfs(gtfs_filepath[stop_times], gtfs[stop_times]);
 
-    gtfs[trips] = mmap_gtfs(gtfs_filepath[trips]);
-    info("Searching for '%s' in '%s'... ", stop_id_pattern, gtfs_filepath[trips]);
-    regex_find(stop_id_pattern, gtfs[trips], 1, stop_id);
-    munmap_gtfs(gtfs_filepath[trips], gtfs[trips]);
-*/
     free(orig.name);
+    free(orig.stop_id);
 
     printf("--------------------------------------------------------------------------------");
     return EXIT_SUCCESS;

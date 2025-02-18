@@ -28,6 +28,9 @@ typedef struct {
 typedef struct {
     char *trip_id;
     char *service_id;
+    char *route_id;
+    char **stop_ids;         // stop_id list
+    unsigned int stop_count; // Number of stops on the route
 } trip_t;
 
 typedef struct {

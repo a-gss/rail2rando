@@ -64,7 +64,7 @@ for (int i = 1; i <= n_capturing_group; i++) {
     return true; // Match
 }
 
-
+// Store the regex result in result[][]
 int regex_find(const char *pattern, char *mmaped_data, int n_capturing_group, char ***result)
 {
     regex_t regex;
@@ -113,11 +113,43 @@ int regex_find(const char *pattern, char *mmaped_data, int n_capturing_group, ch
     }
 
     regfree(&regex);
-    match_count > 0 ? puts(GREEN "MATCH" RESET) : puts(RED "NO MATCH" RESET);
+    match_count > 0 ? printf(GREEN "%d MATCHES\n" RESET, match_count) : puts(RED "NO MATCH" RESET);
 
     return match_count;
 }
 
+char *escape_regex(const char *input) {
+    // Special characters that need to be escaped in regex
+    const char *special_chars = ":|";
+    size_t length = strlen(input);
+    size_t new_len = length;
+
+    // Count how many characters we need to escape
+    for (size_t i = 0; i < length; i++) {
+        if (strchr(special_chars, input[i]) != NULL) {
+            new_len++;
+        }
+    }
+
+    // Allocate memory for the new escaped string
+    char *escaped = (char *)malloc(new_len + 1); // +1 for null terminator
+    if (escaped == NULL) {
+        fprintf(stderr, "Memory allocation error\n");
+        exit(EXIT_FAILURE);
+    }
+
+    size_t j = 0;
+    for (size_t i = 0; i < length; i++) {
+        if (strchr(special_chars, input[i]) != NULL) {
+            escaped[j++] = '\\';  // Add escape character before special char
+        }
+        escaped[j++] = input[i];
+    }
+    escaped[j] = '\0';  // Null terminate the new string
+    return escaped;
+}
+
+/*
 bool regex_find_once(const char *pattern, char *mmaped_data, int n_capturing_group, char **result)
 {
     // Stops after the first match
@@ -153,3 +185,4 @@ bool regex_find_once(const char *pattern, char *mmaped_data, int n_capturing_gro
     puts(RED "NO MATCH" RESET);
     return false;
 }
+*/
