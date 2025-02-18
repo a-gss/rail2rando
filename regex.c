@@ -1,46 +1,127 @@
 #pragma once
 
-bool regex_match(const char *str, regex_t *regex, int n_capturing_group, char result[][64])
+bool regex_match(const char *str, regex_t *regex, int n_capturing_group, char **match)
 {
-    regmatch_t matches[n_capturing_group + 1];  // Index 0 = full match
+    regmatch_t regmatches[n_capturing_group + 1];  // Index 0 = full match
 
-    if (regexec(regex, str, n_capturing_group + 1, matches, 0) == 0) {
-        if (n_capturing_group == 0) {
-            int start = matches[0].rm_so;
-            int end = matches[0].rm_eo;
-            int len = end - start;
-
-            strncpy(result[0], str + start, len);
-            result[0][len] = '\0';
-            printf(GREEN "MATCH: %s\n" RESET, result[0]);
-
-        } else {
-            printf(GREEN "MATCH: ");
-            for (int i = 1; i <= n_capturing_group; i++) {
-                if (matches[i].rm_so != -1) {
-                    int start = matches[i].rm_so;
-                    int end = matches[i].rm_eo;
-                    int len = end - start;
-
-                    strncpy(result[i - 1], str + start, len);
-                    result[i - 1][len] = '\0';
-
-                    (n_capturing_group > 1) ? printf("(%d)%s ", i, result[i - 1])
-                                            : printf("%s ", result[i - 1]);
-                }
-            }
-            puts(RESET);
-        }
-        info("Regex found in '%s'\n", str);
-        return true;
+    if (regexec(regex, str, n_capturing_group + 1, regmatches, 0) != 0) {
+        return false; // No match
     }
 
-    return false;
+    if (n_capturing_group <= 1) {
+        // Allocate new memory for the full match or single capturing group
+        int start = regmatches[n_capturing_group].rm_so;
+        int end = regmatches[n_capturing_group].rm_eo;
+        int len = end - start;
+
+        *match = malloc(len + 1);
+        if (*match == NULL) {
+            error("Memory allocation failed!");
+            exit(EXIT_FAILURE);
+        }
+
+        strncpy(*match, str + start, len);
+        (*match)[len] = '\0'; // Null-terminate
+
+    } else {
+        // Allocate space for capturing groups
+        for (int i = 1; i <= n_capturing_group; i++) {
+            if (regmatches[i].rm_so != -1) {
+                int start = regmatches[i].rm_so;
+                int end = regmatches[i].rm_eo;
+                int len = end - start;
+
+                match[i - 1] = malloc(len + 1);
+                if (match[i - 1] == NULL) {
+                    error("Memory allocation failed!");
+                    exit(EXIT_FAILURE);
+                }
+
+                strncpy(match[i - 1], str + start, len);
+                match[i - 1][len] = '\0';
+            }
+        }
+    }
+
+
+/*
+for (int i = 1; i <= n_capturing_group; i++) {
+    if (regmatches[i].rm_so != -1) {
+        int start = regmatches[i].rm_so;
+        int end = regmatches[i].rm_eo;
+        int len = end - start;
+
+        strncpy(match[i - 1], str + start, len);
+        match[i - 1][len] = '\0';
+
+        //(n_capturing_group > 1) ? printf("(%d)%s ", i, match[i - 1]) : printf("%s ", match[i - 1]);
+    }
+}
+*/
+
+
+    //info("Regex found in '%s'\n", str);
+    return true; // Match
 }
 
 
-bool regex_find(const char *pattern, char *mmaped_data, int n_capturing_group, char result[][64])
+int regex_find(const char *pattern, char *mmaped_data, int n_capturing_group, char ***result)
 {
+    regex_t regex;
+    if (regcomp(&regex, pattern, REG_EXTENDED) != 0) {
+        putchar('\n');
+        error("Erreur de compilation du regex '%s'", pattern);
+        exit(EXIT_FAILURE);
+    }
+
+    // result => array du nombre d'occurence du pattern dans le fichier
+
+    int match_count = 0;
+    char *eof = memchr(mmaped_data, '\0', SIZE_MAX); // Find the end of the file
+    char *start = mmaped_data; // Start at the beginning
+
+    *result = NULL; // Ensure it's NULL initially
+
+    // Extract the line
+    while (start < eof) {
+        char *end = memchr(start, '\n', eof - start);
+        size_t len = end - start;
+        char *line = malloc(len + 1); // + \0
+        if (!line) {
+            error("Memory allocation failed!");
+            exit(EXIT_FAILURE);
+        }
+
+        line = memcpy(line, start, len);
+        line[len-1] = '\0'; // remove the \n from the string
+        start = end + 1;    // move to the next line
+
+        char *match = NULL;
+        if(regex_match(line, &regex, n_capturing_group, &match)) {
+            // reallocate for 1 more string to be stored
+            *result = realloc(*result, (match_count + 1) * sizeof(char *));
+            if (!*result) {
+                error("Memory allocation failed!");
+                exit(EXIT_FAILURE);
+            }
+
+            (*result)[match_count] = match;  // Store new match
+            match_count++;
+        }
+
+        free(line);
+    }
+
+    regfree(&regex);
+    match_count > 0 ? puts(GREEN "MATCH" RESET) : puts(RED "NO MATCH" RESET);
+
+    return match_count;
+}
+
+bool regex_find_once(const char *pattern, char *mmaped_data, int n_capturing_group, char **result)
+{
+    // Stops after the first match
+
     regex_t regex;
     if (regcomp(&regex, pattern, REG_EXTENDED) != 0) {
         error("Erreur de compilation du regex '%s'", pattern);

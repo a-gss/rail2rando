@@ -11,18 +11,31 @@ enum gtfs_index {
 };
 
 char *gtfs_filepath[] = {
-    "GTFS/calendar.txt",
-    "GTFS/calendar_dates.txt",
-    "GTFS/routes.txt",
-    "GTFS/stop_times.txt",
-    "GTFS/stops.txt",
-    "GTFS/trips.txt",
+    "GTFS/LIO/calendar.txt",
+    "GTFS/LIO/calendar_dates.txt",
+    "GTFS/LIO/routes.txt",
+    "GTFS/LIO/stop_times.txt",
+    "GTFS/LIO/stops.txt",
+    "GTFS/LIO/trips.txt",
 };
 
+// TODO: optimize struct packing
 typedef struct {
     char *filepath;
     char *data;
 } gtfs_file_t;
+
+typedef struct {
+    char *trip_id;
+    char *service_id;
+} trip_t;
+
+typedef struct {
+    char *name;
+    char *stop_id;
+    trip_t *trip_list;
+    trip_t best_trip;
+} trainstation_t;
 
 char *mmap_gtfs(char *filepath)
 {
@@ -80,4 +93,9 @@ void munmap_gtfs(char *filepath, void *data)
     }
 
     puts(GREEN "OK" RESET);
+}
+
+void find_earliest_path(trainstation_t *orig) {
+
+    ;
 }

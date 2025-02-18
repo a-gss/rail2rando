@@ -45,7 +45,7 @@ void help(char **argv) {
     printf("Usage : %s [options...] <origine>\n\n"
 
             "Arguments :\n"
-            " <origine>                 Nom de la gare de départ (insensible à la casse)\n\n"
+            " <origine>                 Nom de la gare de départ (sensible à la casse)\n\n"
 
             "Options :\n"
             " -b, --bus                 Ajoute les bus dans le calcul d'itinéraire (le calcul sera plus long mais plus précis)\n"
@@ -73,8 +73,27 @@ void download_gtfs() {
     //  - files do not exist
     //  - files are older than the valid data (updated tout les 5 mois un truc comme ça)
     info("Downloading GTFS data...\n");
-    system("rm -rf GTFS");
+
+
     system("curl --parallel -L --create-dirs "
+        "-s -o GTFS/TER/gtfs_ter.zip 'https://eu.ftp.opendatasoft.com/sncf/gtfs/export-ter-gtfs-last.zip' "
+        "-s -o GTFS/INTERCITES/gtfs_intercites.zip 'https://eu.ftp.opendatasoft.com/sncf/plandata/export-intercites-gtfs-last.zip' "
+        "-s -o GTFS/LIO/gtfs_lio.zip 'https://app.mecatran.com/utw/ws/gtfsfeed/static/lio?apiKey=2b160d626f783808095373766f18714901325e45&type=gtfs_lio' "
+        "-w '[INFO] %{filename_effective} (%{size_download} bytes) DNS: %{time_namelookup} Connect: %{time_connect} PreTransfer: %{time_pretransfer} StartTransfer: %{time_starttransfer} Total: %{time_total} \x1b[32m OK \x1b[0m \n' "
+    );
+
+    // bon les TGV aussi mais si tu prends un putain de TGV pour aller en rando je sais pas cest quoi ton probleme
+
+    system("unzip -oq -d GTFS/TER/ GTFS/TER/gtfs_ter.zip");
+    system("unzip -oq -d GTFS/INTERCITES/ GTFS/INTERCITES/gtfs_intercites.zip");
+    system("unzip -oq -d GTFS/LIO/ GTFS/LIO/gtfs_lio.zip");
+
+    /*
+        system("curl --parallel -L --create-dirs "
+        system("unzip -o export-ter-gtfs-last.zip -d GTFS_TER");
+        system("unzip -o export-intercites-gtfs-last.zip -d GTFS_INTERCITES");
+        system("unzip -o lio.zip -d GTFS_LIO");
+
         "--resolve data.laregion.fr:443:109.232.232.161 "
         "-H 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:134.0) Gecko/20100101 Firefox/134.0' "
         "-H 'X-Requested-With: XMLHttpRequest' "
@@ -86,21 +105,24 @@ void download_gtfs() {
         "-s -o GTFS/stops.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/7068c8d492df76c5125fac081b5e09e9/download/' "
         "-s -o GTFS/trips.txt 'https://data.laregion.fr/explore/dataset/reseau-lio/files/7831854a320cbf4ea5b6b327cd4581af/download/' "
         "-w '[INFO] %{filename_effective} (%{size_download} bytes) DNS: %{time_namelookup} Connect: %{time_connect} PreTransfer: %{time_pretransfer} StartTransfer: %{time_starttransfer} Total: %{time_total} \x1b[32m OK \x1b[0m \n' "
-    );
+        );
+    */
+
 }
 
 int main(int argc, char **argv)
 {
     // Initialize values
     bool flag_bus = false;
+    bool flag_dest = false;
     bool flag_link_lio = false;
     // Get current time
     char date[11];            // yyyy-mm-dd\0
     char heure[6] = "00:00";  // hh:mm\0
-    char orig[16];
     char dest[16] = "";
     // Init the date to today
     strftime(date, sizeof(date), "%F", localtime(&(time_t){time(NULL)}));
+    trainstation_t orig;
 
     if (argc == 1) {
         error("Vous devez spécifier une gare de départ <origine>.");
@@ -109,7 +131,8 @@ int main(int argc, char **argv)
     }
 
     // Get the argument
-    strcpy(orig, argv[argc - 1]);
+    orig.name = (char *)malloc(sizeof(argv[argc - 1]));
+    strcpy(orig.name, argv[argc - 1]);
 
     // Get the options
     // TODO: refaire avec un switch ? https://stackoverflow.com/a/17509552 ou bien avec getopt()
@@ -121,6 +144,7 @@ int main(int argc, char **argv)
             strncpy(date, argv[++i], 10);
 
         } else if (strcmp(argv[i], "--dest") == 0) {
+            flag_dest = true;
             strcpy(dest, argv[++i]);
 
         } else if ((strcmp(argv[i], "--heure") == 0) || (strcmp(argv[i], "-h") == 0)) {
@@ -140,7 +164,7 @@ int main(int argc, char **argv)
         }
     }
 
-    info("Départ de " YELLOW "%s" RESET " à %s le %s\n", orig, heure, date);
+    info("Départ de " YELLOW "%s" RESET " à %s le %s\n", orig.name, heure, date);
     ///info("%s->%s [10:52]->[14:26] (3h34min)\n", orig, dest);
 
     // debug
@@ -150,23 +174,9 @@ int main(int argc, char **argv)
     //printf("heure: %s\n", heure);
     //return 0;
 
-    for (int i = 0; i < GTFS_FILE_NUMBER; i++) {
-        if (access(gtfs_filepath[i], F_OK) != 0) {
-            download_gtfs();
-            break;
-
-        } else if (i == GTFS_FILE_NUMBER - 1) {
-            info("GTFS files found. Skipping download.\n");
-        }
-    }
+//    download_gtfs();
 
     // mmap() GTFS files for fast access
-    //  Bon je crois bien que le GTFS LIO-Occitanie c'est que les arrets de bus
-    //  il faut donc rajouter les TER et les intercités
-    //  https://ressources.data.sncf.com/explore/dataset/sncf-intercites-gtfs/information/
-    //  https://ressources.data.sncf.com/explore/dataset/sncf-ter-gtfs/information/
-    //  et bon les TGV aussi mais si tu prends un putain de TGV pour aller en rando je sais
-    //  pas cest quoi ton probleme
     char *gtfs[GTFS_FILE_NUMBER];
     //gtfs[calendar] = mmap_gtfs("GTFS/calendar.txt");
     //gtfs[calendar_dates] = mmap_gtfs("GTFS/calendar_dates.txt");
@@ -192,21 +202,46 @@ int main(int argc, char **argv)
     gtfs[stops] = mmap_gtfs(gtfs_filepath[stops]);
 
     char stop_id_pattern[64];
-    char stop_id[1][64];
-    snprintf(stop_id_pattern, sizeof(stop_id_pattern), "^([^,]*).*%s", orig);
+    char **stop_id = NULL;
+    unsigned int stop_id_count = 0;
+    snprintf(stop_id_pattern, sizeof(stop_id_pattern), "^([^,]*).*%s.*Gare|^([^,]*).*Gare.*%s", orig.name, orig.name);
+    //snprintf(stop_id_pattern, sizeof(stop_id_pattern), "^([^,]*).*%s", orig.name);
 
-    info("Searching for '%s' in '%s'... ", stop_id_pattern, gtfs_filepath[stops]);
-    if (regex_find(stop_id_pattern, gtfs[stops], 1, stop_id) == true) {
-        info("%s STOP_ID: %s\n", orig, stop_id[0]);
+    info("Searching for '%s' trainstations in '%s'... ", orig.name, gtfs_filepath[stops]);
+    stop_id_count = regex_find(stop_id_pattern, gtfs[stops], 1, &stop_id);
+    if (stop_id_count > 1) {
+        info("%d trainstations found:\n", stop_id_count);
+        for (int i = 0; i < stop_id_count; i++) {
+            info("  - %s STOP_ID: %s\n", orig.name, stop_id[i]);
+        }
+        info("The parent station is likely the first STOP_ID\n");
 
     } else {
         error("Aucun résultat trouvé pour '%s'.", stop_id_pattern);
-        //exit(EXIT_FAILURE);
+        exit(EXIT_FAILURE);
     }
+
+    // Store the 1st stop_id
+    orig.stop_id = malloc(strlen((stop_id[0]) + 1) * sizeof(char));
+    if (orig.stop_id == NULL) {
+        error("Failed to allocate memory for orig.stop_id");
+        exit(EXIT_FAILURE);
+    }
+    strcpy(orig.stop_id, stop_id[0]);
+
+    // Free stop_id
+    for (int i = 0; i < stop_id_count; i++) { free(stop_id[i]); }
+    free(stop_id);
+
+    info("%s STOP_ID: %s\n", orig.name, orig.stop_id);
 
     munmap_gtfs(gtfs_filepath[stops], gtfs[stops]);
 
-    // Juste pour benchmark le regex sur les fichiers
+
+
+
+// Juste pour benchmark le regex sur les fichiers
+/*
     gtfs[calendar] = mmap_gtfs(gtfs_filepath[calendar]);
     info("Searching for '%s' in '%s'... ", stop_id_pattern, gtfs_filepath[calendar]);
     regex_find(stop_id_pattern, gtfs[calendar], 1, stop_id);
@@ -231,6 +266,8 @@ int main(int argc, char **argv)
     info("Searching for '%s' in '%s'... ", stop_id_pattern, gtfs_filepath[trips]);
     regex_find(stop_id_pattern, gtfs[trips], 1, stop_id);
     munmap_gtfs(gtfs_filepath[trips], gtfs[trips]);
+*/
+    free(orig.name);
 
     printf("--------------------------------------------------------------------------------");
     return EXIT_SUCCESS;
