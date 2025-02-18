@@ -186,3 +186,14 @@ bool regex_find_once(const char *pattern, char *mmaped_data, int n_capturing_gro
     return false;
 }
 */
+
+unsigned int count_lines(char *mmaped_data)
+{
+    unsigned int count = 0;
+    char *ptr = mmaped_data;
+    while (*ptr) {
+        if (*ptr == '\n') count++;
+        ptr++;
+    }
+    return count;
+}

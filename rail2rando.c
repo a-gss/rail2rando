@@ -233,7 +233,13 @@ int main(int argc, char **argv)
     regex_find(stop_id_pattern, gtfs[trips], 1, &stop_id);
     munmap_gtfs(gtfs_filepath[trips], gtfs[trips]);
 */
+
+    info("Building GTFS graph...\n");
+    graph_t graph;
+    graph.numNodes = count_lines(gtfs[stops]) - 1;
+    info("  - %d nodes\n", graph.numNodes);
     munmap_gtfs(gtfs_filepath[stops], gtfs[stops]);
+
 /*
     // build graph
     gtfs[stop_times] = mmap_gtfs(gtfs_filepath[stop_times]);
@@ -260,6 +266,6 @@ int main(int argc, char **argv)
 free(orig.name);
 free(orig.stop_id);
 
-    printf("--------------------------------------------------------------------------------");
+    puts("--------------------------------------------------------------------------------");
     return EXIT_SUCCESS;
 }
