@@ -25,7 +25,7 @@ const char *gtfs_filepath[] = {
 typedef struct {
     const char *filepath;
     char *data;
-    size_t size;
+    off_t filesize;
 } gtfs_file_t;
 
 
@@ -56,7 +56,7 @@ char *mmap_gtfs(gtfs_file_t *gtfs)
     }
 
     // Mapping into memory: read, shared to other processes
-    char *mmapped = mmap(NULL, gtfs->size, PROT_READ, MAP_SHARED, fd, 0);
+    char *mmapped = mmap(NULL, gtfs->filesize, PROT_READ, MAP_SHARED, fd, 0);
     if (mmapped == MAP_FAILED) {
         perror("Error mapping file");
         close(fd);
@@ -79,7 +79,7 @@ void munmap_gtfs(gtfs_file_t *gtfs)
         exit(EXIT_FAILURE);
     }
 
-    if (munmap(gtfs->data, gtfs->size) == -1) {
+    if (munmap(gtfs->data, gtfs->filesize) == -1) {
         perror("Error unmapping file");
         close(fd);
         exit(EXIT_FAILURE);
@@ -88,7 +88,7 @@ void munmap_gtfs(gtfs_file_t *gtfs)
     puts(GREEN "OK" RESET);
 }
 
-size_t get_size(gtfs_file_t *gtfs)
+off_t get_size(gtfs_file_t *gtfs)
 {
     // Open the file in read only
     int fd = open(gtfs->filepath, O_RDONLY);

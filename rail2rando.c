@@ -173,7 +173,7 @@ int main(int argc, char **argv)
     // 1. Find the ID of the stations
     gtfs_file_t gtfs_lio[GTFS_FILE_NUMBER];
     gtfs_lio[stops].filepath = gtfs_filepath[stops];
-    gtfs_lio[stops].size = get_size(&gtfs_lio[stops]);
+    gtfs_lio[stops].filesize = get_size(&gtfs_lio[stops]);
     gtfs_lio[stops].data = mmap_gtfs(&gtfs_lio[stops]);
 
     char stop_id_pattern[64];

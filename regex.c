@@ -77,9 +77,9 @@ int regex_find(const char *pattern, gtfs_file_t *gtfs, int n_capturing_group, ch
     // result => array du nombre d'occurence du pattern dans le fichier
 
     int match_count = 0;
-    char *eof = gtfs->data + gtfs->size; // Find the end of the file
-    char *start = gtfs->data;            // Start at the beginning
-    *result = NULL;                      // Ensure it's NULL initially
+    char *eof = gtfs->data + gtfs->filesize; // Find the end of the file
+    char *start = gtfs->data;                // Start at the beginning
+    *result = NULL;                          // Ensure it's NULL initially
 
     // Extract the line
     while (start < eof) {
