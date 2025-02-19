@@ -65,7 +65,7 @@ for (int i = 1; i <= n_capturing_group; i++) {
 }
 
 // Store the regex result in result[][]
-int regex_find(const char *pattern, char *mmaped_data, int n_capturing_group, char ***result)
+int regex_find(const char *pattern, gtfs_file_t *gtfs, int n_capturing_group, char ***result)
 {
     regex_t regex;
     if (regcomp(&regex, pattern, REG_EXTENDED) != 0) {
@@ -77,15 +77,15 @@ int regex_find(const char *pattern, char *mmaped_data, int n_capturing_group, ch
     // result => array du nombre d'occurence du pattern dans le fichier
 
     int match_count = 0;
-    char *eof = memchr(mmaped_data, '\0', SIZE_MAX); // Find the end of the file
-    char *start = mmaped_data; // Start at the beginning
-
-    *result = NULL; // Ensure it's NULL initially
+    char *eof = gtfs->data + gtfs->size; // Find the end of the file
+    char *start = gtfs->data;            // Start at the beginning
+    *result = NULL;                      // Ensure it's NULL initially
 
     // Extract the line
     while (start < eof) {
         char *end = memchr(start, '\n', eof - start);
         size_t len = end - start;
+
         char *line = malloc(len + 1); // + \0
         if (!line) {
             error("Memory allocation failed!");
@@ -187,10 +187,10 @@ bool regex_find_once(const char *pattern, char *mmaped_data, int n_capturing_gro
 }
 */
 
-unsigned int count_lines(char *mmaped_data)
+unsigned int count_lines(gtfs_file_t *gtfs)
 {
     unsigned int count = 0;
-    char *ptr = mmaped_data;
+    char *ptr = gtfs->data;
     while (*ptr) {
         if (*ptr == '\n') count++;
         ptr++;

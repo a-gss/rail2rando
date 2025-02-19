@@ -39,7 +39,7 @@ static inline void logger(const char *color, const char *level, const char *form
 
 #include "gtfs.c"
 #include "regex.c"
-#include "graph.c"
+//#include "graph.c"
 
 void help(char **argv) {
     printf("Usage : %s [options...] <origine>\n\n"
@@ -74,18 +74,20 @@ void download_gtfs() {
     //  - files are older than the valid data (updated tout les 5 mois un truc comme ça)
     info("Downloading GTFS data...\n");
 
-    system("curl --parallel -L --create-dirs "
+    if (system("curl --psarallel -L --create-dirs "
         "-s -o GTFS/TER/gtfs_ter.zip 'https://eu.ftp.opendatasoft.com/sncf/gtfs/export-ter-gtfs-last.zip' "
         "-s -o GTFS/INTERCITES/gtfs_intercites.zip 'https://eu.ftp.opendatasoft.com/sncf/plandata/export-intercites-gtfs-last.zip' "
         "-s -o GTFS/LIO/gtfs_lio.zip 'https://app.mecatran.com/utw/ws/gtfsfeed/static/lio?apiKey=2b160d626f783808095373766f18714901325e45&type=gtfs_lio' "
         "-w '[INFO] %{filename_effective} (%{size_download} bytes) DNS: %{time_namelookup} Connect: %{time_connect} PreTransfer: %{time_pretransfer} StartTransfer: %{time_starttransfer} Total: %{time_total} \x1b[32m OK \x1b[0m \n' "
-    );
+    ) == -1) {
+        perror("Couldn't download GTFS data with CURL.");
+    };
 
     // bon les TGV aussi mais si tu prends un putain de TGV pour aller en rando je sais pas cest quoi ton probleme
 
-    system("unzip -oq -d GTFS/TER/ GTFS/TER/gtfs_ter.zip");
-    system("unzip -oq -d GTFS/INTERCITES/ GTFS/INTERCITES/gtfs_intercites.zip");
-    system("unzip -oq -d GTFS/LIO/ GTFS/LIO/gtfs_lio.zip");
+    if (system("unzip -oq -d GTFS/TER/ GTFS/TER/gtfs_ter.zip") == -1) { perror("Error unzipping GTFS");}
+    if (system("unzip -oq -d GTFS/INTERCITES/ GTFS/INTERCITES/gtfs_intercites.zip") == -1) { perror("Error unzipping GTFS");}
+    if (system("unzip -oq -d GTFS/LIO/ GTFS/LIO/gtfs_lio.zip") == -1) { perror("Error unzipping GTFS");}
 }
 
 int main(int argc, char **argv)
@@ -142,8 +144,6 @@ int main(int argc, char **argv)
         }
     }
 
-
-
     info("Départ de " YELLOW "%s" RESET " à %s le %s\n", orig.name, heure, date);
     ///info("%s->%s [10:52]->[14:26] (3h34min)\n", orig, dest);
 
@@ -169,20 +169,23 @@ int main(int argc, char **argv)
     /*///   6. Print the results
 
 
+
     // 1. Find the ID of the stations
-    char *gtfs[GTFS_FILE_NUMBER];
-    gtfs[stops] = mmap_gtfs(gtfs_filepath[stops]);
+    gtfs_file_t gtfs_lio[GTFS_FILE_NUMBER];
+    gtfs_lio[stops].filepath = gtfs_filepath[stops];
+    gtfs_lio[stops].size = get_size(&gtfs_lio[stops]);
+    gtfs_lio[stops].data = mmap_gtfs(&gtfs_lio[stops]);
 
     char stop_id_pattern[64];
     char **stop_id = NULL;
     unsigned int stop_id_count = 0;
     snprintf(stop_id_pattern, sizeof(stop_id_pattern), "^([^,]*).*%s.*Gare|^([^,]*).*Gare.*%s", orig.name, orig.name);
 
-    info("Searching for '%s' trainstations in '%s'... ", orig.name, gtfs_filepath[stops]);
-    stop_id_count = regex_find(stop_id_pattern, gtfs[stops], 1, &stop_id);
+    info("Searching for '%s' trainstations in '%s'... ", orig.name, gtfs_lio[stops].filepath);
+    stop_id_count = regex_find(stop_id_pattern, &gtfs_lio[stops], 1, &stop_id);
     if (stop_id_count > 1) {
-        info("%d trainstations found:\n", stop_id_count);
-        for (int i = 0; i < stop_id_count; i++) {
+        info("%u trainstations found:\n", stop_id_count);
+        for (size_t i = 0; i < stop_id_count; i++) {
             info("  - %s STOP_ID: %s\n", orig.name, stop_id[i]);
         }
         info("The parent station is likely the first STOP_ID\n");
@@ -193,7 +196,7 @@ int main(int argc, char **argv)
     }
 
     // Store the 1st stop_id
-    orig.stop_id = malloc(strlen(stop_id[0]) + 1);
+    orig.stop_id = (char *)malloc(strlen(stop_id[0]) + 1);
     if (orig.stop_id == NULL) {
         error("Failed to allocate memory for orig.stop_id");
         exit(EXIT_FAILURE);
@@ -201,11 +204,12 @@ int main(int argc, char **argv)
         strcpy(orig.stop_id, stop_id[0]);
 
         // Free stop_id
-        for (int i = 0; i < stop_id_count; i++) { free(stop_id[i]); }
+        for (size_t i = 0; i < stop_id_count; i++) { free(stop_id[i]); }
         free(stop_id);
 
         info("%s STOP_ID: %s\n", orig.name, orig.stop_id);
 
+        munmap_gtfs(&gtfs_lio[stops]);
 // Juste pour benchmark le regex sur les fichiers
 /*
     gtfs[calendar] = mmap_gtfs(gtfs_filepath[calendar]);
@@ -234,15 +238,18 @@ int main(int argc, char **argv)
     munmap_gtfs(gtfs_filepath[trips], gtfs[trips]);
 */
 
+
+/*
     info("Building GTFS graph...\n");
     graph_t graph;
     graph.numNodes = count_lines(gtfs[stops]) - 1;
     info("  - %d nodes\n", graph.numNodes);
-    munmap_gtfs(gtfs_filepath[stops], gtfs[stops]);
+    */
 
-/*
+    /*
     // build graph
     gtfs[stop_times] = mmap_gtfs(gtfs_filepath[stop_times]);
+
 
     // Liste pour stocker les arrêts pour chaque trip
     char **stop_list = NULL;
@@ -263,8 +270,8 @@ int main(int argc, char **argv)
 */
 
 
-free(orig.name);
-free(orig.stop_id);
+    free(orig.name);
+    free(orig.stop_id);
 
     puts("--------------------------------------------------------------------------------");
     return EXIT_SUCCESS;
