@@ -1,5 +1,6 @@
 #pragma once
 
+#include <sys/_types/_off_t.h>
 bool regex_match(const char *str, regex_t *regex, int n_capturing_group, char **match)
 {
     regmatch_t regmatches[n_capturing_group + 1];  // Index 0 = full match
@@ -65,7 +66,7 @@ for (int i = 1; i <= n_capturing_group; i++) {
 }
 
 // Store the regex result in result[][]
-int regex_find(const char *pattern, gtfs_file_t *gtfs, int n_capturing_group, char ***result)
+size_t regex_find(const char *pattern, gtfs_file_t *gtfs, int n_capturing_group, char ***result, off_t offset)
 {
     regex_t regex;
     if (regcomp(&regex, pattern, REG_EXTENDED) != 0) {
@@ -78,7 +79,7 @@ int regex_find(const char *pattern, gtfs_file_t *gtfs, int n_capturing_group, ch
 
     int match_count = 0;
     char *eof = gtfs->data + gtfs->filesize; // Find the end of the file
-    char *start = gtfs->data;                // Start at the beginning
+    char *start = gtfs->data + offset;       // Start at the beginning + offset
     *result = NULL;                          // Ensure it's NULL initially
 
     // Extract the line
@@ -187,13 +188,31 @@ bool regex_find_once(const char *pattern, char *mmaped_data, int n_capturing_gro
 }
 */
 
-unsigned int count_lines(gtfs_file_t *gtfs)
+size_t count_lines(gtfs_file_t *gtfs)
 {
-    unsigned int count = 0;
+    size_t count = 0;
     char *ptr = gtfs->data;
-    while (*ptr) {
+    char *eof = gtfs->data + gtfs->filesize;
+    while (ptr != eof) {
         if (*ptr == '\n') count++;
         ptr++;
     }
     return count;
 }
+
+/*
+size_t count_lines2(gtfs_file_t *gtfs)
+{
+    size_t line_count = 0;
+    char *eof = gtfs->data + gtfs->filesize; // Find the end of the file
+    char *start = gtfs->data;                // Start at the beginning
+
+    while (start < eof) {
+        char *end = memchr(start, '\n', eof - start);
+        start = end + 1;
+        line_count++;
+    }
+
+    return line_count;
+}
+*/
