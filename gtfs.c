@@ -127,10 +127,12 @@ void add_station(graph_t *graph, const char *stop_id) {
 }
 
 // Créer une arête entre node_from et stop_id_to avec une certaine durée/poids
-void add_trips(stop_t *stop, trip_t *trips) {
+void add_trips(stop_t *stop, char **trip_ids) {
     stop->trips = (trip_t *)malloc(stop->nTrips * sizeof(trip_t));
+
     for (size_t i = 0; i < stop->nTrips; i++) {
-        stop->trips[i] = trips[i];
+        stop->trips[i].trip_id = (char *)malloc(strlen(trip_ids[i]));
+        strcpy(stop->trips[i].trip_id, trip_ids[i]);
     }
 
     info("Added %ld trips to %s\n", stop->nTrips, stop->stop_name);

@@ -235,15 +235,14 @@ int main(int argc, char **argv)
     //for (size_t i = 0; i < 6; i++) {
         info("Getting trips for route [%ld]%s... ", i, route_id_list[i]);
         snprintf(trip_id_pattern, sizeof(trip_id_pattern), "^%s,[^,]*,([^,]*)", route_id_list[i]);
-        char **tripd_id_list = NULL;
-        graph.stops[i].nTrips = regex_find(trip_id_pattern, &gtfs_lio[trips], 1, &tripd_id_list, 32);
+        char **trip_id_list = NULL;
+        graph.stops[i].nTrips = regex_find(trip_id_pattern, &gtfs_lio[trips], 1, &trip_id_list, 32);
 
         // Put the trip_ids found in the graph.stop
         graph.stops[i].trips = (trip_t *)malloc(graph.stops[i].nTrips * sizeof(trip_t));
         for (size_t j = 0; j < graph.stops[i].nTrips; j++) {
-            // ca cest add_trips(stop_t *stop, trip_t *trips) en fait
-            graph.stops[i].trips[j].trip_id = (char *)malloc(strlen(tripd_id_list[j]));
-            strcpy(graph.stops[i].trips[j].trip_id, tripd_id_list[j]);
+            graph.stops[i].trips[j].trip_id = (char *)malloc(strlen(trip_id_list[j]));
+            strcpy(graph.stops[i].trips[j].trip_id, trip_id_list[j]);
             info(" [%ld-%03ld] %s\n", i, j+1, graph.stops[i].trips[j].trip_id);
         }
     }
