@@ -74,7 +74,7 @@ void download_gtfs() {
     //  - files are older than the valid data (updated tout les 5 mois un truc comme ça)
     info("Downloading GTFS data...\n");
 
-    if (system("curl --psarallel -L --create-dirs "
+    if (system("curl --parallel -L --create-dirs "
         "-s -o GTFS/TER/gtfs_ter.zip 'https://eu.ftp.opendatasoft.com/sncf/gtfs/export-ter-gtfs-last.zip' "
         "-s -o GTFS/INTERCITES/gtfs_intercites.zip 'https://eu.ftp.opendatasoft.com/sncf/plandata/export-intercites-gtfs-last.zip' "
         "-s -o GTFS/LIO/gtfs_lio.zip 'https://app.mecatran.com/utw/ws/gtfsfeed/static/lio?apiKey=2b160d626f783808095373766f18714901325e45&type=gtfs_lio' "
@@ -233,7 +233,7 @@ int main(int argc, char **argv)
     char trip_id_pattern[64];
     for (size_t i = 0; i < nRoutes; i++) {
     //for (size_t i = 0; i < 6; i++) {
-        info("Getting trips for route [%ld]%s... ", i, route_id_list[i]);
+        //info("Getting trips for route [%ld]%s... ", i, route_id_list[i]);
         snprintf(trip_id_pattern, sizeof(trip_id_pattern), "^%s,[^,]*,([^,]*)", route_id_list[i]);
         char **trip_id_list = NULL;
         graph.stops[i].nTrips = regex_find(trip_id_pattern, &gtfs_lio[trips], 1, &trip_id_list, 32);
@@ -243,7 +243,7 @@ int main(int argc, char **argv)
         for (size_t j = 0; j < graph.stops[i].nTrips; j++) {
             graph.stops[i].trips[j].trip_id = (char *)malloc(strlen(trip_id_list[j]));
             strcpy(graph.stops[i].trips[j].trip_id, trip_id_list[j]);
-            info(" [%ld-%03ld] %s\n", i, j+1, graph.stops[i].trips[j].trip_id);
+            //info(" [%ld-%03ld] %s\n", i, j+1, graph.stops[i].trips[j].trip_id);
         }
     }
 

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <sys/_types/_off_t.h>
 bool regex_match(const char *str, regex_t *regex, int n_capturing_group, char **match)
 {
     regmatch_t regmatches[n_capturing_group + 1];  // Index 0 = full match
