@@ -21,9 +21,9 @@ Le programme liste **tout** les trajets possibles et les trie par ordre décrois
 [^2]: Pas trouvé quoi que ce soit sur le scraping dans les [CGU](https://ignrando.fr/fr/cgu) donc on va faire genre ça passe
 
 ## Compilation
-- Mac OS: ouais
-- Linux: ouais
-- Windows: allez vous faire foutre
+- Mac OS: ouais (avec clang)
+- Linux: ouais (avec gcc)
+- Windows: non (ouais avec WSL2)
 
 J'utilise une seule translation unit donc il suffit de faire:
 ```
